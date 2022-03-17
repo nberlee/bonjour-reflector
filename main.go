@@ -15,7 +15,7 @@ import (
 
 func main() {
 	// Read config file and generate mDNS forwarding maps
-	configPath := flag.String("config", "", "Config file in TOML format")
+	configPath := flag.String("config", "config.toml", "Config file in TOML format")
 	debug := flag.Bool("debug", false, "Enable pprof server on /debug/pprof/")
 	flag.Parse()
 
