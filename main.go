@@ -29,6 +29,8 @@ func main() {
 		log.Fatalf("Could not read configuration: %v", err)
 	}
 	poolsMap := mapByPool(cfg.Devices)
+	vlanIPMap := mapIpSourceByVlan(cfg.VlanIPSource)
+	allowedMacsMap := mapLowerCaseMac(cfg.Devices)
 
 	// Get a handle on the network interface
 	rawTraffic, err := pcap.OpenLive(cfg.NetInterface, 65536, true, time.Second)
@@ -41,11 +43,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	brMACAddress := intf.HardwareAddr
+	srcMACAddress := intf.HardwareAddr
+	processBonjourPackets(rawTraffic, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
 
-	// Filter tagged bonjour traffic
-	filterTemplate := "not (ether src %s) and vlan and dst net (224.0.0.251 or ff02::fb) and udp dst port 5353"
-	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, brMACAddress))
+}
+
+func processBonjourPackets(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAddr, poolsMap map[uint16][]uint16, vlanIPMap map[uint16]net.IP, allowedMacsMap map[macAddress]multicastDevice) {
+	var dstMacAddress net.HardwareAddr
+
+	filterTemplate := "not (ether src %s) and vlan and (dst net (224.0.0.251 or ff02::fb) and udp dst port 5353)"
+	err := rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress))
 	if err != nil {
 		log.Fatalf("Could not apply filter on network interface: %v", err)
 	}
@@ -55,9 +62,18 @@ func main() {
 	source := gopacket.NewPacketSource(rawTraffic, decoder)
 	bonjourPackets := parsePacketsLazily(source)
 
-	// Process Bonjours packets
 	for bonjourPacket := range bonjourPackets {
-		fmt.Println(bonjourPacket.packet.String())
+		fmt.Printf("Bonjour packet received:\n%s\n", bonjourPacket.packet.String())
+
+		// Network devices may set dstMAC to the local MAC address
+		// Rewrite dstMAC to ensure that it is set to the appropriate multicast MAC address
+		if bonjourPacket.isIPv6 {
+			dstMacAddress = net.HardwareAddr{0x33, 0x33, 0x00, 0x00, 0x00, 0xFB}
+		} else {
+			dstMacAddress = net.HardwareAddr{0x01, 0x00, 0x5E, 0x00, 0x00, 0xFB}
+		}
+
+		var srcIP net.IP
 
 		// Forward the mDNS query or response to appropriate VLANs
 		if bonjourPacket.isDNSQuery {
@@ -66,15 +82,30 @@ func main() {
 				continue
 			}
 			for _, tag := range tags {
-				sendBonjourPacket(rawTraffic, &bonjourPacket, tag, brMACAddress)
+				if !bonjourPacket.isIPv6 {
+					srcIP, ok = vlanIPMap[tag]
+					if !ok {
+						srcIP = nil
+					}
+				}
+
+				sendPacket(rawTraffic, &bonjourPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
 			}
 		} else {
-			device, ok := cfg.Devices[macAddress(bonjourPacket.srcMAC.String())]
+
+			device, ok := allowedMacsMap[macAddress(bonjourPacket.srcMAC.String())]
 			if !ok {
 				continue
 			}
 			for _, tag := range device.SharedPools {
-				sendBonjourPacket(rawTraffic, &bonjourPacket, tag, brMACAddress)
+				if !bonjourPacket.isIPv6 {
+					srcIP, ok = vlanIPMap[tag]
+					if !ok {
+						srcIP = nil
+					}
+				}
+
+				sendPacket(rawTraffic, &bonjourPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
 			}
 		}
 	}

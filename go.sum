@@ -1,5 +1,9 @@
+github.com/charithe/timedbuf v0.0.0-20160717160936-e4a8ee453eb4 h1:kR+AroUEp9FGkLiDwitQTESnrovc4++VRw693df+O2Y=
+github.com/charithe/timedbuf v0.0.0-20160717160936-e4a8ee453eb4/go.mod h1:9ev5LJuOzZvgdjc1JpUAC5zK1a8Bg02xf29HWlb5QgQ=
 github.com/google/gopacket v1.1.20-0.20210429153827-3eaba0894325 h1:YmIcZ5Var3BAQ64AW98Iiys5Ih4fiU0xK41+8isC5Ec=
 github.com/google/gopacket v1.1.20-0.20210429153827-3eaba0894325/go.mod h1:riddUzxTSBpJXk3qBHtYr4qOhFhT6k/1c0E3qkQjQpA=
+github.com/oaStuff/timedMap v0.0.0-20171127021412-9b26c8f4a1a6 h1:LXLcwOuNMKism0qpzdtd95nAQN166sO5nptNkvWXDaQ=
+github.com/oaStuff/timedMap v0.0.0-20171127021412-9b26c8f4a1a6/go.mod h1:r8nRcFjSRvj9WdcJ6t0Izw85+W64lJdIdtLLuWl64zo=
 github.com/pelletier/go-toml v1.9.3 h1:zeC5b1GviRUyKYd6OJPvBU/mcVDVoL1OhT17FCt5dSQ=
 github.com/pelletier/go-toml v1.9.3/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
