@@ -162,5 +162,5 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 	gopacket.SerializePacket(buf, serializeOptions, packet.packet)
 	handle.WritePacketData(buf.Bytes())
 
-	logrus.Debugf("Packet sent:\n%s\n", buf)
+	logrus.Debugf("Packet sent:\n%s", packet.packet.String())
 }

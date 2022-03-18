@@ -29,6 +29,9 @@ func main() {
 	if *verbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableQuote: true,
+	})
 	cfg, err := readConfig(*configPath)
 	if err != nil {
 		logrus.Fatalf("Could not read configuration: %v", err)
@@ -68,7 +71,7 @@ func processBonjourPackets(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAd
 	bonjourPackets := parsePacketsLazily(source)
 
 	for bonjourPacket := range bonjourPackets {
-		logrus.Debugf("Bonjour packet received:\n%s\n", bonjourPacket.packet.String())
+		logrus.Debugf("Bonjour packet received:\n%s", bonjourPacket.packet.String())
 
 		// Network devices may set dstMAC to the local MAC address
 		// Rewrite dstMAC to ensure that it is set to the appropriate multicast MAC address
