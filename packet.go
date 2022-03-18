@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/sirupsen/logrus"
 )
 
 type multicastPacket struct {
@@ -162,5 +162,5 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 	gopacket.SerializePacket(buf, serializeOptions, packet.packet)
 	handle.WritePacketData(buf.Bytes())
 
-	fmt.Printf("Packet sent:\n%s\n", buf)
+	logrus.Debugf("Packet sent:\n%s\n", buf)
 }
