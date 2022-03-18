@@ -134,7 +134,7 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 	buf := gopacket.NewSerializeBuffer()
 	serializeOptions := gopacket.SerializeOptions{}
 
-	if !packet.isIPv6 && (srcIP != nil || dstIP != nil) {
+	if srcIP != nil || dstIP != nil {
 		serializeOptions = gopacket.SerializeOptions{ComputeChecksums: true}
 
 		if srcIP != nil {
@@ -144,9 +144,17 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 			*packet.dstIP = dstIP
 		}
 		// We recalculate the checksum since the IP was modified
-		if parsedIP := packet.packet.Layer(layers.LayerTypeIPv4); parsedIP != nil {
-			if parsedUDP := packet.packet.Layer(layers.LayerTypeUDP); parsedUDP != nil {
-				parsedUDP.(*layers.UDP).SetNetworkLayerForChecksum(parsedIP.(*layers.IPv4))
+		if packet.isIPv6 {
+			if parsedIP := packet.packet.Layer(layers.LayerTypeIPv6); parsedIP != nil {
+				if parsedUDP := packet.packet.Layer(layers.LayerTypeUDP); parsedUDP != nil {
+					parsedUDP.(*layers.UDP).SetNetworkLayerForChecksum(parsedIP.(*layers.IPv6))
+				}
+			}
+		} else {
+			if parsedIP := packet.packet.Layer(layers.LayerTypeIPv4); parsedIP != nil {
+				if parsedUDP := packet.packet.Layer(layers.LayerTypeUDP); parsedUDP != nil {
+					parsedUDP.(*layers.UDP).SetNetworkLayerForChecksum(parsedIP.(*layers.IPv4))
+				}
 			}
 		}
 	}
@@ -154,5 +162,5 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 	gopacket.SerializePacket(buf, serializeOptions, packet.packet)
 	handle.WritePacketData(buf.Bytes())
 
-	fmt.Printf("Packet sent:\n%s\n", packet.packet.String())
+	fmt.Printf("Packet sent:\n%s\n", buf)
 }
