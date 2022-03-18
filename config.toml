@@ -16,3 +16,14 @@ net_interface = "wls1" # Put here the network interface you want to use.
     description = "Test Spotify Air"
     origin_pool = 1547
     shared_pools = [1078, 2483, 3133]
+
+[vlan]
+
+    [vlan.1078]
+    ip_source = "192.168.1.253"
+
+    [vlan.1234]
+    ip_source = "192.168.2.253"
+
+    [vlan.1547]
+    ip_source = "192.168.3.253"
