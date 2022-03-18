@@ -29,6 +29,9 @@ func main() {
 	if *verbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableQuote: true,
+	})
 	cfg, err := readConfig(*configPath)
 	if err != nil {
 		logrus.Fatalf("Could not read configuration: %v", err)
