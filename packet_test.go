@@ -150,7 +150,7 @@ func TestParseIPLayer(t *testing.T) {
 	isIPv4 := true
 	ipv4Packet := gopacket.NewPacket(createMockmDNSPacket(isIPv4, true), decoder, options)
 
-	computedIsIPv6 := parseIPLayer(ipv4Packet)
+	computedIsIPv6, _, _ := parseIPLayer(ipv4Packet)
 	if computedIsIPv6 == true {
 		t.Error("Error in parseIPLayer() for IPv4 addresses")
 	}
@@ -158,7 +158,7 @@ func TestParseIPLayer(t *testing.T) {
 	isIPv4 = false
 	ipv6Packet := gopacket.NewPacket(createMockmDNSPacket(isIPv4, true), decoder, options)
 
-	computedIsIPv6 = parseIPLayer(ipv6Packet)
+	computedIsIPv6, _, _ = parseIPLayer(ipv6Packet)
 	if computedIsIPv6 == false {
 		t.Error("Error in parseIPLayer() for IPv6 addresses")
 	}
@@ -170,7 +170,7 @@ func TestParseUDPLayer(t *testing.T) {
 
 	packet := gopacket.NewPacket(createMockmDNSPacket(true, true), decoder, options)
 
-	questionPacketPayload := parseUDPLayer(packet)
+	questionPacketPayload, _, _ := parseUDPLayer(packet)
 	if !reflect.DeepEqual(questionPayloadTest, questionPacketPayload) {
 		t.Error("Error in parseUDPLayer()")
 	}
@@ -182,7 +182,7 @@ func TestParseDNSPayload(t *testing.T) {
 
 	questionPacket := gopacket.NewPacket(createMockmDNSPacket(true, true), decoder, options)
 
-	questionPacketPayload := parseUDPLayer(questionPacket)
+	questionPacketPayload, _, _ := parseUDPLayer(questionPacket)
 
 	questionExpectedResult := true
 	questionComputedResult := parseDNSPayload(questionPacketPayload)
@@ -192,7 +192,7 @@ func TestParseDNSPayload(t *testing.T) {
 
 	answerPacket := gopacket.NewPacket(createMockmDNSPacket(true, false), decoder, options)
 
-	answerPacketPayload := parseUDPLayer(answerPacket)
+	answerPacketPayload, _, _ := parseUDPLayer(answerPacket)
 
 	answerExpectedResult := false
 	answerComputedResult := parseDNSPayload(answerPacketPayload)
@@ -239,7 +239,7 @@ func createMockPacketSource() (packetSource *gopacket.PacketSource, packet gopac
 	return
 }
 
-func areBonjourPacketsEqual(a, b bonjourPacket) (areEqual bool) {
+func areBonjourPacketsEqual(a, b multicastPacket) (areEqual bool) {
 	areEqual = (*a.vlanTag == *b.vlanTag) && (a.srcMAC.String() == b.srcMAC.String()) && (a.isDNSQuery == b.isDNSQuery)
 	// While comparing Bonjour packets, we do not want to compare packets entirely.
 	// In particular, packet.metadata may be slightly different, we do not need them to be the same.
@@ -252,7 +252,7 @@ func TestFilterBonjourPacketsLazily(t *testing.T) {
 	mockPacketSource, packet := createMockPacketSource()
 	packetChan := parsePacketsLazily(mockPacketSource)
 
-	expectedResult := bonjourPacket{
+	expectedResult := multicastPacket{
 		packet:     packet,
 		vlanTag:    &vlanIdentifierTest,
 		srcMAC:     &srcMACTest,
@@ -284,7 +284,7 @@ func TestSendBonjourPacket(t *testing.T) {
 	initialPacketIPv6 := gopacket.NewPacket(initialDataIPv6, decoder, gopacket.DecodeOptions{Lazy: true})
 
 	srcMACv4, dstMACv4 := parseEthernetLayer(initialPacketIPv4)
-	bonjourTestPacketIPv4 := bonjourPacket{
+	bonjourTestPacketIPv4 := multicastPacket{
 		packet:     initialPacketIPv4,
 		vlanTag:    parseVLANTag(initialPacketIPv4),
 		srcMAC:     srcMACv4,
@@ -294,7 +294,7 @@ func TestSendBonjourPacket(t *testing.T) {
 	}
 
 	srcMACv6, dstMACv6 := parseEthernetLayer(initialPacketIPv6)
-	bonjourTestPacketIPv6 := bonjourPacket{
+	bonjourTestPacketIPv6 := multicastPacket{
 		packet:     initialPacketIPv6,
 		vlanTag:    parseVLANTag(initialPacketIPv6),
 		srcMAC:     srcMACv6,
@@ -315,12 +315,12 @@ func TestSendBonjourPacket(t *testing.T) {
 
 	pw := &mockPacketWriter{packet: nil}
 
-	sendBonjourPacket(pw, &bonjourTestPacketIPv4, newVlanTag, brMACTest)
+	sendPacket(pw, &bonjourTestPacketIPv4, newVlanTag, brMACTest)
 	if !reflect.DeepEqual(expectedPacketIPv4.Layers(), pw.packet.Layers()) {
 		t.Error("Error in sendBonjourPacket() for IPv4")
 	}
 
-	sendBonjourPacket(pw, &bonjourTestPacketIPv6, newVlanTag, brMACTest)
+	sendPacket(pw, &bonjourTestPacketIPv6, newVlanTag, brMACTest)
 	if !reflect.DeepEqual(expectedPacketIPv6.Layers(), pw.packet.Layers()) {
 		t.Error("Error in sendBonjourPacket() for IPv6")
 	}

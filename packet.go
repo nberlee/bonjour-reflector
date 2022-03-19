@@ -10,17 +10,18 @@ import (
 )
 
 type multicastPacket struct {
-	packet      gopacket.Packet
-	srcMAC      *net.HardwareAddr
-	dstMAC      *net.HardwareAddr
-	srcIP       *net.IP
-	dstIP       *net.IP
-	srcPort     *layers.UDPPort
-	dstPort     *layers.UDPPort
-	isIPv6      bool
-	vlanTag     *uint16
-	isDNSQuery  bool
-	isSSDPQuery bool
+	packet              gopacket.Packet
+	srcMAC              *net.HardwareAddr
+	dstMAC              *net.HardwareAddr
+	srcIP               *net.IP
+	dstIP               *net.IP
+	srcPort             *layers.UDPPort
+	dstPort             *layers.UDPPort
+	isIPv6              bool
+	vlanTag             *uint16
+	isDNSQuery          bool
+	isSSDPQuery         bool
+	isSSDPAdvertisement bool
 }
 
 func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
@@ -46,21 +47,22 @@ func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
 
 			isDNSQuery := parseDNSPayload(payload)
 
-			isSSDPQuery := parseSSDPPayload(payload)
+			isSSDPQuery, isSSDPAdvertisement := parseSSDPPayload(payload)
 
 			// Pass on the packet for its next adventure
 			packetChan <- multicastPacket{
-				packet:      packet,
-				vlanTag:     tag,
-				srcMAC:      srcMAC,
-				dstMAC:      dstMAC,
-				srcIP:       srcIP,
-				dstIP:       dstIP,
-				srcPort:     srcPort,
-				dstPort:     dstPort,
-				isIPv6:      isIPv6,
-				isDNSQuery:  isDNSQuery,
-				isSSDPQuery: isSSDPQuery,
+				packet:              packet,
+				vlanTag:             tag,
+				srcMAC:              srcMAC,
+				dstMAC:              dstMAC,
+				srcIP:               srcIP,
+				dstIP:               dstIP,
+				srcPort:             srcPort,
+				dstPort:             dstPort,
+				isIPv6:              isIPv6,
+				isDNSQuery:          isDNSQuery,
+				isSSDPQuery:         isSSDPQuery,
+				isSSDPAdvertisement: isSSDPAdvertisement,
 			}
 		}
 	}()
@@ -114,11 +116,9 @@ func parseDNSPayload(payload []byte) (isDNSQuery bool) {
 	return
 }
 
-func parseSSDPPayload(payload []byte) (isSSDPQuery bool) {
-	packet := gopacket.NewPacket(payload, layers.LayerTypeDNS, gopacket.Default)
-	if ssdp := packet.ApplicationLayer(); ssdp != ssdp {
-		isSSDPQuery = strings.HasPrefix(string(ssdp.Payload()), "M-SEARCH ")
-	}
+func parseSSDPPayload(payload []byte) (isSSDPQuery bool, isSSDPAdvertisement bool) {
+	isSSDPQuery = strings.HasPrefix(string(payload), "M-SEARCH * HTTP")
+	isSSDPAdvertisement = strings.HasPrefix(string(payload), "NOTIFY * HTTP")
 	return
 }
 

@@ -6,11 +6,8 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"time"
 
 	_ "github.com/emadolsky/automaxprocs/maxprocs"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,85 +35,23 @@ func main() {
 	}
 	poolsMap := mapByPool(cfg.Devices)
 	vlanIPMap := mapIpSourceByVlan(cfg.VlanIPSource)
-	allowedMacsMap := mapLowerCaseMac(cfg.Devices)
 
-	// Get a handle on the network interface
-	rawTraffic, err := pcap.OpenLive(cfg.NetInterface, 65536, true, time.Second)
-	if err != nil {
-		logrus.Fatalf("Could not find network interface: %v", cfg.NetInterface)
-	}
-
-	// Get the local MAC address, to filter out Bonjour packet generated locally
 	intf, err := net.InterfaceByName(cfg.NetInterface)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 	srcMACAddress := intf.HardwareAddr
-	processBonjourPackets(rawTraffic, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
 
-}
+	stop := make(chan struct{})
+	defer close(stop)
 
-func processBonjourPackets(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAddr, poolsMap map[uint16][]uint16, vlanIPMap map[uint16]net.IP, allowedMacsMap map[macAddress]multicastDevice) {
-	var dstMacAddress net.HardwareAddr
+	go ownupNetworkAddresses(cfg.NetInterface, srcMACAddress, vlanIPMap, stop)
 
-	filterTemplate := "not (ether src %s) and vlan and (dst net (224.0.0.251 or ff02::fb) and udp dst port 5353)"
-	err := rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress))
-	if err != nil {
-		logrus.Fatalf("Could not apply filter on network interface: %v", err)
-	}
+	allowedMacsMap := mapLowerCaseMac(cfg.Devices)
+	go processSSDPPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
 
-	// Get a channel of Bonjour packets to process
-	decoder := gopacket.DecodersByLayerName["Ethernet"]
-	source := gopacket.NewPacketSource(rawTraffic, decoder)
-	bonjourPackets := parsePacketsLazily(source)
+	processBonjourPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
 
-	for bonjourPacket := range bonjourPackets {
-		logrus.Debugf("Bonjour packet received:\n%s", bonjourPacket.packet.String())
-
-		// Network devices may set dstMAC to the local MAC address
-		// Rewrite dstMAC to ensure that it is set to the appropriate multicast MAC address
-		if bonjourPacket.isIPv6 {
-			dstMacAddress = net.HardwareAddr{0x33, 0x33, 0x00, 0x00, 0x00, 0xFB}
-		} else {
-			dstMacAddress = net.HardwareAddr{0x01, 0x00, 0x5E, 0x00, 0x00, 0xFB}
-		}
-
-		var srcIP net.IP
-
-		// Forward the mDNS query or response to appropriate VLANs
-		if bonjourPacket.isDNSQuery {
-			tags, ok := poolsMap[*bonjourPacket.vlanTag]
-			if !ok {
-				continue
-			}
-			for _, tag := range tags {
-				if !bonjourPacket.isIPv6 {
-					srcIP, ok = vlanIPMap[tag]
-					if !ok {
-						srcIP = nil
-					}
-				}
-
-				sendPacket(rawTraffic, &bonjourPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
-			}
-		} else {
-
-			device, ok := allowedMacsMap[macAddress(bonjourPacket.srcMAC.String())]
-			if !ok {
-				continue
-			}
-			for _, tag := range device.SharedPools {
-				if !bonjourPacket.isIPv6 {
-					srcIP, ok = vlanIPMap[tag]
-					if !ok {
-						srcIP = nil
-					}
-				}
-
-				sendPacket(rawTraffic, &bonjourPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
-			}
-		}
-	}
 }
 
 func debugServer(port int) {
