@@ -10,4 +10,4 @@ require (
 	github.com/zekroTJA/timedmap v1.4.0
 )
 
-require golang.org/x/sys v0.0.0-20220318055525-2edf467146b5 // indirect
+require golang.org/x/sys v0.1.0 // indirect
