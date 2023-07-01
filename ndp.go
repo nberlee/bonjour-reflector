@@ -45,7 +45,7 @@ func respondToNeighborSolicitation(rawTraffic *pcap.Handle, packet gopacket.Pack
 		return
 	}
 
-	logrus.Infof("Replied to %v for ip %s", net.HardwareAddr(srcMAC), IPv6Address.String())
+	logrus.Debugf("Replied to %v for ip %s", net.HardwareAddr(srcMAC), IPv6Address.String())
 
 }
 

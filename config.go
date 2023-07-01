@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -26,6 +28,28 @@ type multicastDevice struct {
 type vlanID string
 type vlanIpSource struct {
 	IpSource net.IP `toml:"ip_source"`
+}
+
+func findConfigFile() (*string, error) {
+	// Check if the config file is specified in the environment
+	configFile := os.Getenv("CONFIG")
+	if configFile != "" {
+		return &configFile, nil
+	}
+
+	// Check if the config file is in the current directory
+	checkFile := "config.toml"
+	if _, err := os.Stat(checkFile); err == nil {
+		return &checkFile, nil
+	}
+
+	// Check if the config file is in the config directory
+	checkFile = "config/config.toml"
+	if _, err := os.Stat(checkFile); err == nil {
+		return &checkFile, nil
+	}
+
+	return nil, errors.New("no config file found")
 }
 
 func readConfig(path string) (cfg config, err error) {
