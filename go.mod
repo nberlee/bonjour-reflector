@@ -1,13 +1,14 @@
 module github.com/nberlee/bonjour-reflector
 
-go 1.17
+go 1.20
 
 require (
-	github.com/emadolsky/automaxprocs v1.4.1-0.20220104203543-349281033d17
 	github.com/google/gopacket v1.1.20-0.20210429153827-3eaba0894325
+	github.com/nberlee/gopacket v0.0.0-20220328194512-a67e38f22540
 	github.com/pelletier/go-toml v1.9.4
 	github.com/sirupsen/logrus v1.8.1
 	github.com/zekroTJA/timedmap v1.4.0
+	go.uber.org/automaxprocs v1.5.2
 )
 
 require golang.org/x/sys v0.1.0 // indirect

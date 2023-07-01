@@ -7,8 +7,8 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	_ "github.com/emadolsky/automaxprocs/maxprocs"
 	"github.com/sirupsen/logrus"
+	_ "go.uber.org/automaxprocs"
 )
 
 func main() {
@@ -16,6 +16,7 @@ func main() {
 	configPath := flag.String("config", "config.toml", "Config file in TOML format")
 	debug := flag.Bool("debug", false, "Enable pprof server on /debug/pprof/")
 	verbose := flag.Bool("verbose", false, "See packets")
+	silent := flag.Bool("silent", false, "Only warnings and errors")
 
 	flag.Parse()
 
@@ -25,6 +26,9 @@ func main() {
 	}
 	if *verbose {
 		logrus.SetLevel(logrus.DebugLevel)
+	}
+	if *silent {
+		logrus.SetLevel(logrus.WarnLevel)
 	}
 	logrus.SetFormatter(&logrus.TextFormatter{
 		DisableQuote: true,

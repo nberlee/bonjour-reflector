@@ -33,7 +33,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 		logrus.Fatalf("Could not find network interface: %v", netInterface)
 	}
 
-	filterTemplate := "not (ether src %s) and vlan and udp and ((dst net (239.255.255.250 or ff02::c or ff05::c or ff08::c) and dst port 1900) or ether dst %s)"
+	filterTemplate := "not (ether src %s) and vlan and udp and ((dst net (239.255.255.250 or ff02::c or ff05::c or ff08::c) and dst port 1900) or (ether dst %s and not dst port 5353))"
 
 	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress, srcMACAddress))
 	if err != nil {
