@@ -3,8 +3,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/gopacket v1.1.20-0.20210429153827-3eaba0894325 h1:YmIcZ5Var3BAQ64AW98Iiys5Ih4fiU0xK41+8isC5Ec=
 github.com/google/gopacket v1.1.20-0.20210429153827-3eaba0894325/go.mod h1:riddUzxTSBpJXk3qBHtYr4qOhFhT6k/1c0E3qkQjQpA=
-github.com/nberlee/gopacket v0.0.0-20220328194512-a67e38f22540 h1:HJx0olhghxdL3Ja+EtkX04kiSKUR8Ml1mvl9FJG1oto=
-github.com/nberlee/gopacket v0.0.0-20220328194512-a67e38f22540/go.mod h1:skMkt2EO+kvYCbyE060WENj2G3/MB5YRidvIpDHc9sY=
 github.com/pelletier/go-toml v1.9.4 h1:tjENF6MfZAg8e4ZmZTeWaWiT2vXtsoO6+iuOjFhECwM=
 github.com/pelletier/go-toml v1.9.4/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

@@ -90,7 +90,7 @@ func respondToArpRequests(rawTraffic *pcap.Handle, packet gopacket.Packet, srcMA
 		return
 	}
 
-	logrus.Infof("Replied to %v for ip %s", net.HardwareAddr(arp.SourceHwAddress), ip.String())
+	logrus.Debugf("Replied to %v for ip %s", net.HardwareAddr(arp.SourceHwAddress), ip.String())
 }
 
 func sendARP(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAddr, dstMACAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP, vlanTag uint16) error {
