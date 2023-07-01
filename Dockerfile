@@ -1,10 +1,11 @@
 FROM golang:alpine as gobuild
 
-RUN apk add --no-cache libpcap-dev git gcc libc-dev
+RUN apk add --no-cache libpcap-dev git gcc libc-dev libcap-utils
 WORKDIR github.com/nberlee/bonjour-reflector
 COPY go.* .
 COPY *.go .
 RUN GOOS=linux go build -ldflags="-s -w"
+RUN setcap cap_net_raw+ep bonjour-reflector
 
 
 FROM alpine as rootfs
