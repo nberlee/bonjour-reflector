@@ -14,7 +14,6 @@ import (
 
 type ssdpRequest struct {
 	ip           net.IP
-	port         layers.UDPPort
 	tag          uint16
 	macAddress   net.HardwareAddr
 	allowedVlans []uint16
@@ -49,6 +48,11 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 	tmssdpAdvertisementSession := timedmap.New(time.Second)
 
 	for ssdpPacket := range ssdpPackets {
+		if !ssdpPacket.isSSDPAdvertisement && !ssdpPacket.isSSDPQuery && !ssdpPacket.isSSDPResponse {
+			logrus.Warnf("Got a packet that is not a SSDP query, response or advertisement:\n%s", ssdpPacket.packet.String())
+			continue
+		}
+
 		var srcIP net.IP
 		if ssdpPacket.isIPv6 {
 			srcIP = IPv6Address // ssdp packet cannot be routed from other vlan as it is link-local, so just rewrite it to our own link-local.
@@ -94,7 +98,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 					}
 				}
 
-				tmssdpQuerySession.Set(*ssdpPacket.srcPort, ssdpSession, ssdpSessionDuration)
+				tmssdpQuerySession.Set(*ssdpPacket.srcPort, ssdpSession, time.Duration(ssdpPacket.maxWaitTime+1)*time.Second)
 				sendPacket(rawTraffic, &ssdpPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
 			}
 		} else if ssdpPacket.isSSDPAdvertisement {
@@ -145,7 +149,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 			// Two responses are possible here:
 			// Allowed Mac-address responding from on a SSDP query
 			// A shared pool vlan ip responding to a SSDP advertisement
-		} else if device, ok := allowedMacsMap[macAddress(ssdpPacket.srcMAC.String())]; ok {
+		} else if device, ok := allowedMacsMap[macAddress(ssdpPacket.srcMAC.String())]; ok && ssdpPacket.isSSDPResponse {
 
 			logrus.Debugf("SSDP query response packet received:\n%s", ssdpPacket.packet.String())
 			if device.OriginPool != *ssdpPacket.vlanTag {
@@ -171,46 +175,6 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 			}
 
 			sendPacket(rawTraffic, &ssdpPacket, tag, srcMACAddress, dstMacAddress, srcIP, dstIP)
-		} else {
-			_, ok := poolsMap[*ssdpPacket.vlanTag]
-			if !ok {
-				continue
-			}
-			logrus.Debugf("SSDP advertisement response packet received:\n%s", ssdpPacket.packet.String())
-			if !tmssdpAdvertisementSession.Contains(*ssdpPacket.dstPort) {
-				logrus.Infof("No matching SSDP session found with SSDP request/advertisement src port %d.\n", uint32(*ssdpPacket.dstPort))
-				continue
-			}
-
-			tmssdpAdvertisementSession.Refresh(*ssdpPacket.dstPort, ssdpSessionDuration)
-			ssdpSession := tmssdpAdvertisementSession.GetValue(*ssdpPacket.dstPort)
-
-			if !contains(ssdpSession.(ssdpRequest).allowedVlans, *ssdpPacket.vlanTag) {
-				logrus.Warningf("spoofing/vlan leak detected from %s, got a packet from VLAN %d which is not allowed for this session.", ssdpPacket.srcMAC.String(), *ssdpPacket.vlanTag)
-				continue
-			}
-
-			tag := ssdpSession.(ssdpRequest).tag
-			dstIP := ssdpSession.(ssdpRequest).ip
-			dstMacAddress := ssdpSession.(ssdpRequest).macAddress
-
-			if !ssdpPacket.isIPv6 {
-				srcIP, ok = vlanIPMap[tag]
-				if !ok {
-					srcIP = nil
-				}
-			}
-			sendPacket(rawTraffic, &ssdpPacket, tag, srcMACAddress, dstMacAddress, srcIP, dstIP)
-
 		}
 	}
-}
-
-func contains(s []uint16, e uint16) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }

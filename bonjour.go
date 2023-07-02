@@ -32,6 +32,10 @@ func processBonjourPackets(netInterface string, srcMACAddress net.HardwareAddr, 
 
 	for bonjourPacket := range bonjourPackets {
 		logrus.Debugf("Bonjour packet received:\n%s", bonjourPacket.packet.String())
+		if !bonjourPacket.isDNSQuery && !bonjourPacket.isDNSResponse {
+			logrus.Warningf("Received unexpected Bonjour packet: %s", bonjourPacket.packet.String())
+			continue
+		}
 
 		var srcIP net.IP
 		// Network devices may set dstMAC to the local MAC address
@@ -59,8 +63,7 @@ func processBonjourPackets(netInterface string, srcMACAddress net.HardwareAddr, 
 
 				sendPacket(rawTraffic, &bonjourPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
 			}
-		} else {
-
+		} else if bonjourPacket.isDNSResponse {
 			device, ok := allowedMacsMap[macAddress(bonjourPacket.srcMAC.String())]
 			if !ok {
 				continue

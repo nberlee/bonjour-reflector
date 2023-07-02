@@ -2,6 +2,9 @@ name: ci
 
 on:
   push:
+  pull_request:
+    branches: 
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -34,7 +37,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
+      - 
+        name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175
         with:
@@ -46,5 +50,5 @@ jobs:
           context: .
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,
+          platforms: ${{ github.event_name == 'push' && 'linux/arm64' || 'linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6' }}
           push: true

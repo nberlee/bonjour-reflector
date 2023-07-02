@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -53,7 +52,7 @@ func findConfigFile() (*string, error) {
 }
 
 func readConfig(path string) (cfg config, err error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return config{}, err
 	}
