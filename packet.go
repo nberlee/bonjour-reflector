@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"net"
-	"strings"
+	"net/http"
+	"strconv"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -20,8 +23,11 @@ type multicastPacket struct {
 	isIPv6              bool
 	vlanTag             *uint16
 	isDNSQuery          bool
+	isDNSResponse       bool
 	isSSDPQuery         bool
 	isSSDPAdvertisement bool
+	isSSDPResponse      bool
+	maxWaitTime         uint8
 }
 
 func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
@@ -45,10 +51,19 @@ func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
 			// Get UDP payload
 			payload, srcPort, dstPort := parseUDPLayer(packet)
 
-			isDNSQuery := parseDNSPayload(payload)
+			// Check if DNS query
+			isDNSQuery, isDNSResponse := false, false
+			if dstPort != nil && *dstPort == 5353 {
+				isDNSQuery, isDNSResponse = parseDNSPayload(payload)
+			}
 
-			isSSDPQuery, isSSDPAdvertisement := parseSSDPPayload(payload)
-
+			// Check if SSDP query
+			isSSDPQuery, isSSDPAdvertisement, isSSDPResponse, maxWaitTime := false, false, false, uint8(ssdpSessionDuration)
+			if dstPort != nil && *dstPort == 1900 {
+				isSSDPQuery, isSSDPAdvertisement, maxWaitTime = parseSSDPQuery(payload)
+			} else if !isDNSQuery && !isDNSResponse {
+				isSSDPResponse = parseSSDPResponse(payload)
+			}
 			// Pass on the packet for its next adventure
 			packetChan <- multicastPacket{
 				packet:              packet,
@@ -61,8 +76,11 @@ func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
 				dstPort:             dstPort,
 				isIPv6:              isIPv6,
 				isDNSQuery:          isDNSQuery,
+				isDNSResponse:       isDNSResponse,
 				isSSDPQuery:         isSSDPQuery,
 				isSSDPAdvertisement: isSSDPAdvertisement,
+				isSSDPResponse:      isSSDPResponse,
+				maxWaitTime:         maxWaitTime,
 			}
 		}
 	}()
@@ -108,17 +126,70 @@ func parseUDPLayer(packet gopacket.Packet) (payload []byte, srcPort *layers.UDPP
 	return
 }
 
-func parseDNSPayload(payload []byte) (isDNSQuery bool) {
+func parseDNSPayload(payload []byte) (isDNSQuery bool, isDNSResponse bool) {
 	packet := gopacket.NewPacket(payload, layers.LayerTypeDNS, gopacket.Default)
 	if parsedDNS := packet.Layer(layers.LayerTypeDNS); parsedDNS != nil {
-		isDNSQuery = !parsedDNS.(*layers.DNS).QR
+		isDNSResponse = parsedDNS.(*layers.DNS).QR
+		isDNSQuery = !isDNSResponse
 	}
 	return
 }
 
-func parseSSDPPayload(payload []byte) (isSSDPQuery bool, isSSDPAdvertisement bool) {
-	isSSDPQuery = strings.HasPrefix(string(payload), "M-SEARCH * HTTP")
-	isSSDPAdvertisement = strings.HasPrefix(string(payload), "NOTIFY * HTTP")
+func parseSSDPQuery(payload []byte) (isSSDPQuery bool, isSSDPAdvertisement bool, maxWaitTime uint8) {
+
+	// SSDP packets are HTTP-like, so we can parse them as such
+	// https://tools.ietf.org/html/draft-cai-ssdp-v1-03
+
+	// Check if the packet is a valid HTTP request
+
+	parsedHTTP, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(payload)))
+	if err != nil {
+		return
+	}
+
+	isSSDPQuery = parsedHTTP.Method == "M-SEARCH" &&
+		parsedHTTP.RequestURI == "*" &&
+		parsedHTTP.Header.Get("MAN") == `"ssdp:discover"`
+
+	isSSDPAdvertisement = parsedHTTP.Method == "NOTIFY" &&
+		parsedHTTP.RequestURI == "*" &&
+		parsedHTTP.Header.Get("NT") != "" &&
+		(parsedHTTP.Header.Get("NTS") == "ssdp:alive" || parsedHTTP.Header.Get("NTS") == "ssdp:byebye")
+
+	if isSSDPQuery {
+		if mx, err := strconv.Atoi(parsedHTTP.Header.Get("MX")); err == nil {
+			if mx >= 1 && mx <= 120 {
+				maxWaitTime = uint8(mx)
+			} else if mx > 120 {
+				maxWaitTime = 120
+			}
+		} else {
+			isSSDPQuery = false
+		}
+	}
+
+	parsedHTTP.Body.Close()
+	return
+}
+
+func parseSSDPResponse(payload []byte) (isSSDPResponse bool) {
+
+	// SSDP packets are HTTP-like, so we can parse them as such
+	// https://tools.ietf.org/html/draft-cai-ssdp-v1-03
+
+	// Check if the packet is a valid HTTP response
+
+	parsedHTTP, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(payload)), nil)
+	if err != nil {
+		return
+	}
+
+	isSSDPResponse = parsedHTTP.Header.Get("CACHE-CONTROL") != "" &&
+		parsedHTTP.Header.Get("LOCATION") != "" &&
+		parsedHTTP.Header.Get("ST") != "" &&
+		parsedHTTP.Header.Get("USN") != ""
+
+	parsedHTTP.Body.Close()
 	return
 }
 
