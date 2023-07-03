@@ -1,0 +1,13 @@
+namespace: mdns
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+#  - cnp.yaml
+
+
+configMapGenerator:
+- name: bonjour-reflector-config
+  files:
+    - config/config.toml

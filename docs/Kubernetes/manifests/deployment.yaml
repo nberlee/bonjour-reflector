@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bonjour-reflector
+  namespace: mdns
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: bonjour
+  template:
+    metadata:
+      labels:
+        app: bonjour
+    spec:
+      hostNetwork: true
+#      nodeName: talos-home-4
+      serviceAccountName: bonjour-reflector
+      containers:
+      - image: ghcr.io/nberlee/bonjour-reflector:main
+        imagePullPolicy: Always
+        name: bonjour-reflector
+#        command:
+#          - "/bonjour-reflector"
+#          - "-verbose"
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+              - NET_RAW
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          limits:
+            memory: 150Mi
+          requests:
+            cpu: 200m
+            memory: 150Mi
+        volumeMounts:
+        - name: config
+          mountPath: "/config.toml"
+          subPath: config.toml
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: bonjour-reflector-config

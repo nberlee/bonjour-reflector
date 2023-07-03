@@ -1,0 +1,34 @@
+net_interface = "eth0"
+
+[devices]
+
+    [devices."71:27:06:20:A7:E6"]
+    description = "Bedroom TV"
+    origin_pool = 100
+    shared_pools = [101, 103]
+
+    [devices."01:10:B1:E1:69:98"]
+    description = "Onkyo amplifier"
+    origin_pool = 100
+    shared_pools = [101, 103]
+
+    [devices."00:04:4B:5D:F2:D3"]
+    description = "NVidia Shield"
+    origin_pool = 100
+    shared_pools = [101, 103]
+
+    [devices."DC:A6:32:2B:31:19"]
+    description = "Volumio bathroom"
+    origin_pool = 103
+    shared_pools = [101]
+
+[vlan]
+
+    [vlan.100]
+    ip_source = "192.168.100.2"
+
+    [vlan.101]
+    ip_source = "192.168.101.2"
+
+    [vlan.103]
+    ip_source = "192.168.103.2"
