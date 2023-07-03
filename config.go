@@ -20,6 +20,7 @@ type config struct {
 }
 
 type multicastDevice struct {
+	Description string   `toml:"description,omitempty"`
 	OriginPool  uint16   `toml:"origin_pool"`
 	SharedPools []uint16 `toml:"shared_pools"`
 }
