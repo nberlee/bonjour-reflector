@@ -48,6 +48,12 @@ See the [config.md](../config.md) for detailed explaination.
 
 Edit your own `config.toml` and upload it to your router in a directory, for example the default `/pub` directory, as its not strait forward to create a directory in RouterOS.
 
+Afterwards changes may be done to the file without reuploading again, using:
+
+```mikrotik
+/file edit pub/config.toml
+```
+
 ## Container mount
 Create a container mount to the directory you uploaded the `config.toml` to. Make sure to change the `src` to the path you uploaded the file to.
 
