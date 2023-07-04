@@ -29,7 +29,8 @@ func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, 
 	}
 	// Announce link-local just once after startup
 	for vlan := range vlanIPMap {
-		err := sendNA(rawTraffic, srcMACAddress, net.HardwareAddr{0x33, 0x33, 0x00, 0x00, 0x00, 0x01}, IPv6Address, net.ParseIP("ff02::1"), vlan)
+
+		err := sendNA(rawTraffic, srcMACAddress, net.HardwareAddr{0x33, 0x33, 0x00, 0x00, 0x00, 0x01}, IPv6Address, net.IPv6linklocalallnodes, vlan)
 		if err != nil {
 			logrus.Error(err)
 			continue
