@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/sirupsen/logrus"
 	"github.com/zekroTJA/timedmap"
@@ -66,12 +65,8 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 				continue
 			}
 			logrus.Debugf("SSDP query packet received:\n%s", ssdpPacket.packet.String())
-			if *ssdpPacket.dstPort != layers.UDPPort(1900) {
-				logrus.Infof("Protocol violation from %s, got a SSDP query from a non query destination port.", ssdpPacket.dstMAC.String())
-				continue
-			}
 			if ssdpPacket.dstMAC == &srcMACAddress {
-				logrus.Infof("Protocol violation from %s, got a SSDP query from an unicast packet.", ssdpPacket.dstMAC.String())
+				logrus.Infof("Protocol violation from %s, got a SSDP query from an unicast packet.", ssdpPacket.srcMAC.String())
 				continue
 			}
 
@@ -111,12 +106,8 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 				logrus.Warningf("spoofing/vlan leak detected from %s. Config expected traffic from VLAN %d, got a packet from %d.", ssdpPacket.srcMAC.String(), device.OriginPool, *ssdpPacket.vlanTag)
 				continue
 			}
-			if *ssdpPacket.dstPort != layers.UDPPort(1900) {
-				logrus.Infof("Protocol violation from %s, got a SSDP advertisement from a non advertisement destination port.", ssdpPacket.dstMAC.String())
-				continue
-			}
 			if ssdpPacket.dstMAC == &srcMACAddress {
-				logrus.Infof("Protocol violation from %s, got a SSDP advertisement from an unicast packet.", ssdpPacket.dstMAC.String())
+				logrus.Infof("Protocol violation from %s, got a SSDP advertisement from an unicast packet.", ssdpPacket.srcMAC.String())
 				continue
 			}
 
@@ -146,9 +137,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 				tmssdpAdvertisementSession.Set(*ssdpPacket.srcPort, ssdpSession, ssdpSessionDuration)
 				sendPacket(rawTraffic, &ssdpPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
 			}
-			// Two responses are possible here:
 			// Allowed Mac-address responding from on a SSDP query
-			// A shared pool vlan ip responding to a SSDP advertisement
 		} else if device, ok := allowedMacsMap[macAddress(ssdpPacket.srcMAC.String())]; ok && ssdpPacket.isSSDPResponse {
 
 			logrus.Debugf("SSDP query response packet received:\n%s", ssdpPacket.packet.String())
