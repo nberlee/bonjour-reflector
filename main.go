@@ -53,6 +53,8 @@ func main() {
 	}
 	srcMACAddress := intf.HardwareAddr
 
+	removeVlanFilter(intf.Name)
+
 	stop := make(chan struct{})
 	defer close(stop)
 
