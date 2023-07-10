@@ -12,6 +12,17 @@ func removeVlanFilter(iface string) {
 	}
 	defer ethHandle.Close()
 
+	features, err := ethHandle.Features(iface)
+	if err != nil {
+		logrus.Errorf("Unable to get all interface features of %s: %v", iface, err)
+		return
+	}
+
+	if !features["rx-vlan-filter"] {
+		return
+	}
+
+	logrus.Infof("Changing hardware vlan filter (rx-vlan-filter) of interface %s to false.", iface)
 	err = ethHandle.Change(iface, map[string]bool{
 		"rx-vlan-filter": false,
 	})
