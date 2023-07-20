@@ -8,7 +8,7 @@ require (
 	github.com/safchain/ethtool v0.3.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/zekroTJA/timedmap v1.5.1
-	go.uber.org/automaxprocs v1.5.2
+	go.uber.org/automaxprocs v1.5.3
 )
 
 require golang.org/x/sys v0.6.0 // indirect
