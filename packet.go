@@ -3,13 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
-	"github.com/sirupsen/logrus"
 )
 
 type multicastPacket struct {
@@ -233,5 +233,5 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 	gopacket.SerializePacket(buf, serializeOptions, packet.packet)
 	handle.WritePacketData(buf.Bytes())
 
-	logrus.Debugf("Packet sent:\n%s", packet.packet.String())
+	slog.Debug("Packet sent", packet.packet.String())
 }

@@ -1,8 +1,9 @@
 package main
 
 import (
+	"log/slog"
+
 	"github.com/safchain/ethtool"
-	"github.com/sirupsen/logrus"
 )
 
 func removeVlanFilter(iface string) {
@@ -16,7 +17,7 @@ func removeVlanFilter(iface string) {
 		"rx-vlan-filter": false,
 	})
 	if err != nil {
-		logrus.Errorf("Unable to remove the hardware vlan filter (rx-vlan-filter): %v", err)
+		slog.Error("Unable to remove the hardware vlan filter (rx-vlan-filter)", err)
 	}
 
 }

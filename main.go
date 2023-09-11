@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
-	"github.com/sirupsen/logrus"
 	_ "go.uber.org/automaxprocs"
 )
 
@@ -24,32 +25,45 @@ func main() {
 	if *debug {
 		go debugServer(6060)
 	}
+	l := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
 	if *verbose {
-		logrus.SetLevel(logrus.DebugLevel)
+		l = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+
 	}
 	if *silent {
-		logrus.SetLevel(logrus.WarnLevel)
+		l = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelWarn,
+		}))
 	}
-	logrus.SetFormatter(&logrus.TextFormatter{
-		DisableQuote: true,
-	})
+
+	slog.SetDefault(l)
+
 	if configPath == nil || *configPath == "" {
 		var err error
 		configPath, err = findConfigFile()
 		if err != nil {
-			logrus.Fatal("Could not find config file")
+			slog.Error("Could not find config file")
+			os.Exit(1)
 		}
 	}
 	cfg, err := readConfig(*configPath)
 	if err != nil {
-		logrus.Fatalf("Could not read configuration: %v", err)
+		slog.Error("Could not read configuration", err)
+		os.Exit(1)
 	}
 	poolsMap := mapByPool(cfg.Devices)
 	vlanIPMap := mapIpSourceByVlan(cfg.VlanIPSource)
 
 	intf, err := net.InterfaceByName(cfg.NetInterface)
 	if err != nil {
-		logrus.Fatal(err)
+		slog.Error("failed to get interface",
+			"interface", cfg.NetInterface,
+			"error", err)
+		os.Exit(1)
 	}
 	srcMACAddress := intf.HardwareAddr
 
@@ -70,6 +84,9 @@ func main() {
 func debugServer(port int) {
 	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
 	if err != nil {
-		logrus.Fatalf("The application was started with -debug flag but could not listen on port %v: \n %s", port, err)
+		slog.Error("The application was started with -debug flag but could not listen on port",
+			"port", port,
+			"error", err)
+		os.Exit(1)
 	}
 }

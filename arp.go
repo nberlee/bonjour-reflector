@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
+	"os"
 	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcap"
-	"github.com/sirupsen/logrus"
 )
 
 func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP, stop chan struct{}) {
@@ -16,14 +17,15 @@ func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, 
 	// Get a handle on the network interface
 	rawTraffic, err := pcap.OpenLive(netInterface, 65536, true, time.Second)
 	if err != nil {
-		logrus.Fatalf("Could not find network interface: %v", netInterface)
+		slog.Error("Could not find network interface", netInterface)
+		os.Exit(1)
 	}
 
 	// Gratuitous ARP just once after startup
 	for vlan, ip := range vlanIPMap {
 		err := sendARP(rawTraffic, srcMACAddress, net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, ip, ip, vlan)
 		if err != nil {
-			logrus.Error(err)
+			slog.Error("Error sending gratuitous arp", err)
 			continue
 		}
 	}
@@ -32,7 +34,7 @@ func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, 
 
 		err := sendNA(rawTraffic, srcMACAddress, net.HardwareAddr{0x33, 0x33, 0x00, 0x00, 0x00, 0x01}, IPv6Address, net.IPv6linklocalallnodes, vlan)
 		if err != nil {
-			logrus.Error(err)
+			slog.Error("Error sending ipv6 neighbor advertisement (optimistic DAD)", err)
 			continue
 		}
 	}
@@ -40,7 +42,8 @@ func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, 
 	filterTemplate := "not (ether src %s) and vlan and (arp or icmp6)"
 	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress))
 	if err != nil {
-		logrus.Fatalf("Could not apply filter on network interface: %v", err)
+		slog.Error("Could not apply filter on network interface", err)
+		os.Exit(1)
 	}
 	src := gopacket.NewPacketSource(rawTraffic, layers.LayerTypeEthernet)
 	in := src.Packets()
@@ -87,11 +90,13 @@ func respondToArpRequests(rawTraffic *pcap.Handle, packet gopacket.Packet, srcMA
 
 	err := sendARP(rawTraffic, srcMACAddress, net.HardwareAddr(arp.SourceHwAddress), ip, arp.SourceProtAddress, *tag)
 	if err != nil {
-		logrus.Error(err)
+		slog.Error("Error sending arp reply", err)
 		return
 	}
 
-	logrus.Debugf("Replied to %v for ip %s", net.HardwareAddr(arp.SourceHwAddress), ip.String())
+	slog.Debug("Replied to ndp",
+		"mac", net.HardwareAddr(arp.SourceHwAddress),
+		"ip", ip.String())
 }
 
 func sendARP(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAddr, dstMACAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP, vlanTag uint16) error {

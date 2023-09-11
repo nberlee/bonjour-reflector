@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
+	"os"
 	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/pcap"
-	"github.com/sirupsen/logrus"
 )
 
 func processBonjourPackets(netInterface string, srcMACAddress net.HardwareAddr, poolsMap map[uint16][]uint16, vlanIPMap map[uint16]net.IP, allowedMacsMap map[macAddress]multicastDevice) {
@@ -16,13 +17,15 @@ func processBonjourPackets(netInterface string, srcMACAddress net.HardwareAddr, 
 	// Get a handle on the network interface
 	rawTraffic, err := pcap.OpenLive(netInterface, 65536, true, time.Second)
 	if err != nil {
-		logrus.Fatalf("Could not find network interface: %v", netInterface)
+		slog.Error("Could not find network interface", netInterface)
+		os.Exit(1)
 	}
 
 	filterTemplate := "not (ether src %s) and vlan and (dst net (224.0.0.251 or ff02::fb) and udp dst port 5353)"
 	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress))
 	if err != nil {
-		logrus.Fatalf("Could not apply filter on network interface: %v", err)
+		slog.Error("Could not apply filter on network interface", err)
+		os.Exit(1)
 	}
 
 	// Get a channel of Bonjour packets to process
@@ -31,9 +34,9 @@ func processBonjourPackets(netInterface string, srcMACAddress net.HardwareAddr, 
 	bonjourPackets := parsePacketsLazily(source)
 
 	for bonjourPacket := range bonjourPackets {
-		logrus.Debugf("Bonjour packet received:\n%s", bonjourPacket.packet.String())
+		slog.Debug("Bonjour packet received", bonjourPacket.packet.String())
 		if !bonjourPacket.isDNSQuery && !bonjourPacket.isDNSResponse {
-			logrus.Warningf("Received unexpected Bonjour packet: %s", bonjourPacket.packet.String())
+			slog.Warn("Received unexpected Bonjour packet", bonjourPacket.packet.String())
 			continue
 		}
 
@@ -69,7 +72,10 @@ func processBonjourPackets(netInterface string, srcMACAddress net.HardwareAddr, 
 				continue
 			}
 			if device.OriginPool != *bonjourPacket.vlanTag {
-				logrus.Warningf("spoofing/vlan leak detected from %s. Config expected traffic from VLAN %d, got a packet from VLAN %d.", bonjourPacket.srcMAC.String(), device.OriginPool, *bonjourPacket.vlanTag)
+				slog.Warn("Spoofing/vlan leak detected from sourceMac. Traffic was expected from expectedVlan, got a packet from vlanTag",
+					"sourceMac", bonjourPacket.srcMAC.String(),
+					"expectedVlan", device.OriginPool,
+					"vlanTag", *&bonjourPacket.vlanTag)
 				continue
 			}
 

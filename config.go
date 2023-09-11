@@ -2,13 +2,13 @@ package main
 
 import (
 	"errors"
+	"log/slog"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/pelletier/go-toml"
-	"github.com/sirupsen/logrus"
 )
 
 type macAddress string
@@ -83,7 +83,8 @@ func mapIpSourceByVlan(vlanipsource map[vlanID]vlanIpSource) map[uint16](net.IP)
 	for vlan, value := range vlanipsource {
 		vlanID, err := strconv.Atoi(string(vlan))
 		if err != nil {
-			logrus.Errorf("cannot decode %s to vlanID\n", vlan)
+			slog.Error("Cannot decode vlan in config to vlanID",
+				"configuredVlanID", vlan)
 			continue
 		}
 		vlanMap[uint16(vlanID)] = value.IpSource

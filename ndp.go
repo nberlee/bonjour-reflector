@@ -1,12 +1,12 @@
 package main
 
 import (
+	"log/slog"
 	"net"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcap"
-	"github.com/sirupsen/logrus"
 )
 
 var IPv6Address net.IP
@@ -41,11 +41,13 @@ func respondToNeighborSolicitation(rawTraffic *pcap.Handle, packet gopacket.Pack
 	}
 	err := sendNA(rawTraffic, srcMACAddress, srcMAC, IPv6Address, srcIP, tag)
 	if err != nil {
-		logrus.Error(err)
+		slog.Error("Error sending ndp reply", err)
 		return
 	}
 
-	logrus.Debugf("Replied to %v for ip %s", net.HardwareAddr(srcMAC), IPv6Address.String())
+	slog.Debug("Replied to ndp",
+		"mac", net.HardwareAddr(srcMAC),
+		"ip", IPv6Address.String())
 
 }
 

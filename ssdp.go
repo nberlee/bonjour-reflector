@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
+	"os"
 	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/pcap"
-	"github.com/sirupsen/logrus"
 	"github.com/zekroTJA/timedmap"
 )
 
@@ -28,14 +29,16 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 	// Get a handle on the network interface
 	rawTraffic, err := pcap.OpenLive(netInterface, 65536, true, time.Second)
 	if err != nil {
-		logrus.Fatalf("Could not find network interface: %v", netInterface)
+		slog.Error("Could not find network interface", netInterface)
+		os.Exit(1)
 	}
 
 	filterTemplate := "not (ether src %s) and vlan and udp and ((dst net (239.255.255.250 or ff02::c or ff05::c or ff08::c) and dst port 1900) or (ether dst %s and not dst port 5353))"
 
 	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress, srcMACAddress))
 	if err != nil {
-		logrus.Fatalf("Could not apply filter on network interface: %v", err)
+		slog.Error("Could not apply filter on network interface", err)
+		os.Exit(1)
 	}
 
 	// Get a channel of SSDP packets to process
@@ -48,7 +51,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 
 	for ssdpPacket := range ssdpPackets {
 		if !ssdpPacket.isSSDPAdvertisement && !ssdpPacket.isSSDPQuery && !ssdpPacket.isSSDPResponse {
-			logrus.Warnf("Got a packet that is not a SSDP query, response or advertisement:\n%s", ssdpPacket.packet.String())
+			slog.Warn("Got a packet that is not a SSDP query, response or advertisement", ssdpPacket.packet.String())
 			continue
 		}
 
@@ -64,9 +67,11 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 			if !ok {
 				continue
 			}
-			logrus.Debugf("SSDP query packet received:\n%s", ssdpPacket.packet.String())
+			slog.Debug("SSDP query packet received", ssdpPacket.packet.String())
 			if ssdpPacket.dstMAC == &srcMACAddress {
-				logrus.Infof("Protocol violation from %s, got a SSDP query from an unicast packet.", ssdpPacket.srcMAC.String())
+
+				slog.Info("Got a SSDP advertisement from an unicast packet. This is a protocol violation",
+					"sourceMac", ssdpPacket.srcMAC.String())
 				continue
 			}
 
@@ -101,13 +106,19 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 			if !ok {
 				continue
 			}
-			logrus.Debugf("SSDP advertisement packet received:\n%s", ssdpPacket.packet.String())
+			slog.Debug("SSDP advertisement packet received", ssdpPacket.packet.String())
 			if device.OriginPool != *ssdpPacket.vlanTag {
-				logrus.Warningf("spoofing/vlan leak detected from %s. Config expected traffic from VLAN %d, got a packet from %d.", ssdpPacket.srcMAC.String(), device.OriginPool, *ssdpPacket.vlanTag)
+				slog.Warn("Spoofing/vlan leak detected from sourceMac. Traffic was expected from expectedVlan, got a packet from vlanTag",
+					"sourceMac", ssdpPacket.srcMAC.String(),
+					"expectedVlan", device.OriginPool,
+					"vlanTag", *ssdpPacket.vlanTag)
+
 				continue
 			}
 			if ssdpPacket.dstMAC == &srcMACAddress {
-				logrus.Infof("Protocol violation from %s, got a SSDP advertisement from an unicast packet.", ssdpPacket.srcMAC.String())
+				slog.Info("Got a SSDP advertisement from an unicast packet. This is a protocol violation",
+					"sourceMac", ssdpPacket.srcMAC.String())
+
 				continue
 			}
 
@@ -139,14 +150,20 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 			}
 			// Allowed Mac-address responding from on a SSDP query
 		} else if device, ok := allowedMacsMap[macAddress(ssdpPacket.srcMAC.String())]; ok && ssdpPacket.isSSDPResponse {
+			slog.Debug("SSDP query response packet received", ssdpPacket.packet.String())
 
-			logrus.Debugf("SSDP query response packet received:\n%s", ssdpPacket.packet.String())
 			if device.OriginPool != *ssdpPacket.vlanTag {
-				logrus.Warningf("spoofing/vlan leak detected from %s. Config expected traffic from VLAN %d, got a packet from VLAN %d.", ssdpPacket.srcMAC.String(), device.OriginPool, *ssdpPacket.vlanTag)
+				slog.Warn("Spoofing/vlan leak detected from sourceMac. Traffic was expected from expectedVlan, got a packet from vlanTag",
+					"sourceMac", ssdpPacket.srcMAC.String(),
+					"expectedVlan", device.OriginPool,
+					"vlanTag", *ssdpPacket.vlanTag)
+
 				continue
 			}
 			if !tmssdpQuerySession.Contains(*ssdpPacket.dstPort) {
-				logrus.Infof("No matching SSDP session found with SSDP request/advertisement src port %d.\n", uint32(*ssdpPacket.dstPort))
+				slog.Info("No matching SSDP session found with SSDP request/advertisement",
+					"sourcePort", uint32(*ssdpPacket.dstPort))
+
 				continue
 			}
 			tmssdpQuerySession.Refresh(*ssdpPacket.dstPort, ssdpSessionDuration)
