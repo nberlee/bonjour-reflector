@@ -58,6 +58,10 @@ func readConfig(path string) (cfg config, err error) {
 		return config{}, err
 	}
 	err = toml.Unmarshal(content, &cfg)
+	if cfg.NetInterface == "" {
+		cfg.NetInterface = "eth0"
+	}
+
 	return cfg, err
 }
 

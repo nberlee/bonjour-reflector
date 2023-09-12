@@ -2,12 +2,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log/slog"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
 
 	_ "go.uber.org/automaxprocs"
 )
@@ -15,16 +14,11 @@ import (
 func main() {
 	// Read config file and generate mDNS forwarding maps
 	configPath := flag.String("config", "", "Config file in TOML format")
-	debug := flag.Bool("debug", false, "Enable pprof server on /debug/pprof/")
 	verbose := flag.Bool("verbose", false, "See packets")
 	silent := flag.Bool("silent", false, "Only warnings and errors")
 
 	flag.Parse()
 
-	// Start debug server
-	if *debug {
-		go debugServer(6060)
-	}
 	l := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
@@ -72,21 +66,18 @@ func main() {
 	stop := make(chan struct{})
 	defer close(stop)
 
+	allowedMacsMap := mapLowerCaseMac(cfg.Devices)
+
+	go packetCapture(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap, stop)
 	go ownupNetworkAddresses(cfg.NetInterface, srcMACAddress, vlanIPMap, stop)
 
-	allowedMacsMap := mapLowerCaseMac(cfg.Devices)
-	go processSSDPPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
+	// Create a channel to listen for SIGTERM or SIGINT signals
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
-	processBonjourPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
+	// Block until a signal is received
+	<-sigCh
 
-}
-
-func debugServer(port int) {
-	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
-	if err != nil {
-		slog.Error("The application was started with -debug flag but could not listen on port",
-			"port", port,
-			"error", err)
-		os.Exit(1)
-	}
+	// Optionally, log or perform some cleanup
+	slog.Info("Received termination signal. Exiting...")
 }

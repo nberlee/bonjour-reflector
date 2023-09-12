@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/afpacket"
 	"github.com/gopacket/gopacket/layers"
 )
 
@@ -22,6 +23,8 @@ type multicastPacket struct {
 	dstPort             *layers.UDPPort
 	isIPv6              bool
 	vlanTag             *uint16
+	isARP               bool
+	isNDP               bool
 	isDNSQuery          bool
 	isDNSResponse       bool
 	isSSDPQuery         bool
@@ -51,6 +54,12 @@ func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
 			// Get UDP payload
 			payload, srcPort, dstPort := parseUDPLayer(packet)
 
+			isARP, isNDP := false, false
+			if payload == nil {
+				// Check if ARP or NDP
+				isARP, isNDP = parseAdressResolutionProtocol(packet)
+				isIPv6 = isNDP
+			}
 			// Check if DNS query
 			isDNSQuery, isDNSResponse := false, false
 			if dstPort != nil && *dstPort == 5353 {
@@ -72,6 +81,8 @@ func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
 				dstMAC:              dstMAC,
 				srcIP:               srcIP,
 				dstIP:               dstIP,
+				isARP:               isARP,
+				isNDP:               isNDP,
 				srcPort:             srcPort,
 				dstPort:             dstPort,
 				isIPv6:              isIPv6,
@@ -135,6 +146,19 @@ func parseDNSPayload(payload []byte) (isDNSQuery bool, isDNSResponse bool) {
 	return
 }
 
+func parseAdressResolutionProtocol(packet gopacket.Packet) (isARP bool, isNDP bool) {
+	if packet.Layer(layers.LayerTypeARP) != nil {
+		isARP = true
+		isNDP = false
+	}
+
+	if packet.Layer(layers.LayerTypeICMPv6NeighborSolicitation) != nil {
+		isARP = false
+		isNDP = true
+	}
+	return
+}
+
 func parseSSDPQuery(payload []byte) (isSSDPQuery bool, isSSDPAdvertisement bool, maxWaitTime uint8) {
 
 	// SSDP packets are HTTP-like, so we can parse them as such
@@ -193,11 +217,7 @@ func parseSSDPResponse(payload []byte) (isSSDPResponse bool) {
 	return
 }
 
-type packetWriter interface {
-	WritePacketData([]byte) error
-}
-
-func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMACAddress net.HardwareAddr, dstMacAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP) {
+func sendPacket(handle *afpacket.TPacket, packet *multicastPacket, tag uint16, srcMACAddress net.HardwareAddr, dstMacAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP) {
 	*packet.vlanTag = tag
 	*packet.srcMAC = srcMACAddress
 	*packet.dstMAC = dstMacAddress
@@ -231,7 +251,11 @@ func sendPacket(handle packetWriter, packet *multicastPacket, tag uint16, srcMAC
 	}
 
 	gopacket.SerializePacket(buf, serializeOptions, packet.packet)
-	handle.WritePacketData(buf.Bytes())
+	err := handle.WritePacketData(buf.Bytes())
+	if err != nil {
+		slog.Error("Error sending packet", err)
+		return
+	}
 
 	slog.Debug("Packet sent", packet.packet.String())
 }

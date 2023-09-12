@@ -5,53 +5,35 @@ import (
 	"net"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/afpacket"
 	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcap"
 )
 
 var IPv6Address net.IP
 
-func respondToNeighborSolicitation(rawTraffic *pcap.Handle, packet gopacket.Packet, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP) {
-	var tag uint16
-
-	if parsedTag := packet.Layer(layers.LayerTypeDot1Q); parsedTag != nil {
-		tag = parsedTag.(*layers.Dot1Q).VLANIdentifier
-	}
-	if vlanIPMap[tag] == nil {
+func respondToNeighborSolicitation(rawTraffic *afpacket.TPacket, packet multicastPacket, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP) {
+	if vlanIPMap[*packet.vlanTag] == nil {
 		return
 	}
 
-	nsLayer := packet.Layer(layers.LayerTypeICMPv6NeighborSolicitation)
-	if nsLayer == nil {
-		return
-	}
-	ns := nsLayer.(*layers.ICMPv6NeighborSolicitation)
+	ns := packet.packet.Layer(layers.LayerTypeICMPv6NeighborSolicitation).(*layers.ICMPv6NeighborSolicitation)
 	if !net.IP(ns.TargetAddress).Equal(IPv6Address) {
 		return
 	}
 
-	var srcMAC net.HardwareAddr
-	if parsedEth := packet.Layer(layers.LayerTypeEthernet); parsedEth != nil {
-		srcMAC = parsedEth.(*layers.Ethernet).SrcMAC
-	}
-
-	var srcIP net.IP
-	if parsedIP := packet.Layer(layers.LayerTypeIPv6); parsedIP != nil {
-		srcIP = parsedIP.(*layers.IPv6).SrcIP
-	}
-	err := sendNA(rawTraffic, srcMACAddress, srcMAC, IPv6Address, srcIP, tag)
+	err := sendNA(rawTraffic, srcMACAddress, *packet.srcMAC, IPv6Address, *packet.srcIP, *packet.vlanTag)
 	if err != nil {
 		slog.Error("Error sending ndp reply", err)
 		return
 	}
 
 	slog.Debug("Replied to ndp",
-		"mac", net.HardwareAddr(srcMAC),
+		"mac", net.HardwareAddr(*packet.srcMAC),
 		"ip", IPv6Address.String())
 
 }
 
-func sendNA(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAddr, dstMACAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP, vlanTag uint16) error {
+func sendNA(rawTraffic *afpacket.TPacket, srcMACAddress net.HardwareAddr, dstMACAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP, vlanTag uint16) error {
 	sendEth := layers.Ethernet{
 		SrcMAC:       srcMACAddress,
 		DstMAC:       dstMACAddress,

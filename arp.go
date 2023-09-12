@@ -1,25 +1,24 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net"
 	"os"
-	"time"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/afpacket"
 	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcap"
 )
 
 func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP, stop chan struct{}) {
 	IPv6Address = generateIPv6FromMac(srcMACAddress)
 	// Get a handle on the network interface
-	rawTraffic, err := pcap.OpenLive(netInterface, 65536, true, time.Second)
+	rawTraffic, err := afpacket.NewTPacket(afpacket.OptInterface(netInterface))
 	if err != nil {
 		slog.Error("Could not find network interface", netInterface)
 		os.Exit(1)
 	}
+	defer rawTraffic.Close()
 
 	// Gratuitous ARP just once after startup
 	for vlan, ip := range vlanIPMap {
@@ -38,48 +37,18 @@ func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, 
 			continue
 		}
 	}
-
-	filterTemplate := "not (ether src %s) and vlan and (arp or icmp6)"
-	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress))
-	if err != nil {
-		slog.Error("Could not apply filter on network interface", err)
-		os.Exit(1)
-	}
-	src := gopacket.NewPacketSource(rawTraffic, layers.LayerTypeEthernet)
-	in := src.Packets()
-
-	for {
-		var packet gopacket.Packet
-		select {
-		case <-stop:
-			return
-		case packet = <-in:
-			if packet.Layer(layers.LayerTypeARP) != nil {
-				respondToArpRequests(rawTraffic, packet, srcMACAddress, vlanIPMap)
-			}
-			if packet.Layer(layers.LayerTypeICMPv6NeighborSolicitation) != nil {
-				respondToNeighborSolicitation(rawTraffic, packet, srcMACAddress, vlanIPMap)
-			}
-		}
-	}
 }
 
 // respondToArpRequests watches a handle for incoming ARP requests we might care about, and replies to them
 //
 // respondToArpRequests loops until 'stop' is closed.
-func respondToArpRequests(rawTraffic *pcap.Handle, packet gopacket.Packet, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP) {
-	tag := parseVLANTag(packet)
-	ip := vlanIPMap[*tag]
+func respondToArpRequests(rawTraffic *afpacket.TPacket, packet multicastPacket, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP) {
+	ip := vlanIPMap[*packet.vlanTag]
 	if ip == nil {
 		return
 	}
 
-	arpLayer := packet.Layer(layers.LayerTypeARP)
-	if arpLayer == nil {
-		return
-	}
-
-	arp := arpLayer.(*layers.ARP)
+	arp := packet.packet.Layer(layers.LayerTypeARP).(*layers.ARP)
 	if arp.Operation != layers.ARPRequest {
 		return
 	}
@@ -88,18 +57,18 @@ func respondToArpRequests(rawTraffic *pcap.Handle, packet gopacket.Packet, srcMA
 		return
 	}
 
-	err := sendARP(rawTraffic, srcMACAddress, net.HardwareAddr(arp.SourceHwAddress), ip, arp.SourceProtAddress, *tag)
+	err := sendARP(rawTraffic, srcMACAddress, net.HardwareAddr(arp.SourceHwAddress), ip, arp.SourceProtAddress, *packet.vlanTag)
 	if err != nil {
 		slog.Error("Error sending arp reply", err)
 		return
 	}
 
-	slog.Debug("Replied to ndp",
+	slog.Debug("Replied to arp",
 		"mac", net.HardwareAddr(arp.SourceHwAddress),
 		"ip", ip.String())
 }
 
-func sendARP(rawTraffic *pcap.Handle, srcMACAddress net.HardwareAddr, dstMACAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP, vlanTag uint16) error {
+func sendARP(rawTraffic *afpacket.TPacket, srcMACAddress net.HardwareAddr, dstMACAddress net.HardwareAddr, srcIP net.IP, dstIP net.IP, vlanTag uint16) error {
 	if len(srcIP) == 16 {
 		srcIP = srcIP[12:] // net.IP is 16 bytes, which make the FixLength fail as an ip can only be 4
 	}
