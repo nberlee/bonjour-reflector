@@ -7,17 +7,17 @@ import (
 	"testing"
 )
 
-var devices = map[macAddress]bonjourDevice{
-	"00:14:22:01:23:45": bonjourDevice{OriginPool: 45, SharedPools: []uint16{42, 1042, 46}},
-	"00:14:22:01:23:46": bonjourDevice{OriginPool: 46, SharedPools: []uint16{176, 148}},
-	"00:14:22:01:23:47": bonjourDevice{OriginPool: 47, SharedPools: []uint16{1042, 1717, 13}},
+var devices = map[macAddress]multicastDevice{
+	"00:14:22:01:23:45": {Description: "Test Chromecast", OriginPool: 45, SharedPools: []uint16{42, 1042, 46}},
+	"00:14:22:01:23:46": {Description: "Test Spotify Air", OriginPool: 46, SharedPools: []uint16{176, 148}},
+	"00:14:22:01:23:47": {Description: "Test Spotify Air", OriginPool: 47, SharedPools: []uint16{1042, 1717, 13}},
 }
 
 func TestReadConfig(t *testing.T) {
 	// Check that a valid config file is read adequately
 	validTestConfigFile := "config_test.toml"
 	computedCfg, err := readConfig(validTestConfigFile)
-	expectedCfg := brconfig{
+	expectedCfg := config{
 		NetInterface: "test0",
 		Devices:      devices,
 	}
@@ -31,7 +31,7 @@ func TestReadConfig(t *testing.T) {
 	// Check that a non-existant config file is handled adequately
 	nonexistantConfigFile := "nonexistant_test.toml"
 	computedCfg, err = readConfig(nonexistantConfigFile)
-	if !reflect.DeepEqual(computedCfg, brconfig{}) {
+	if !reflect.DeepEqual(computedCfg, config{}) {
 		t.Error("Error in readConfig(): unexpected config returned for non-existant config file")
 	}
 	if !os.IsNotExist(err) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"net"
 	"reflect"
@@ -185,7 +186,7 @@ func TestParseDNSPayload(t *testing.T) {
 	questionPacketPayload, _, _ := parseUDPLayer(questionPacket)
 
 	questionExpectedResult := true
-	questionComputedResult := parseDNSPayload(questionPacketPayload)
+	questionComputedResult, _ := parseDNSPayload(questionPacketPayload)
 	if !reflect.DeepEqual(questionExpectedResult, questionComputedResult) {
 		t.Error("Error in parseDNSPayload() for DNS queries")
 	}
@@ -195,7 +196,7 @@ func TestParseDNSPayload(t *testing.T) {
 	answerPacketPayload, _, _ := parseUDPLayer(answerPacket)
 
 	answerExpectedResult := false
-	answerComputedResult := parseDNSPayload(answerPacketPayload)
+	answerComputedResult, _ := parseDNSPayload(answerPacketPayload)
 	if !reflect.DeepEqual(answerExpectedResult, answerComputedResult) {
 		t.Error("Error in parseDNSPayload() for DNS answers")
 	}
@@ -289,6 +290,8 @@ func TestSendBonjourPacket(t *testing.T) {
 		vlanTag:    parseVLANTag(initialPacketIPv4),
 		srcMAC:     srcMACv4,
 		dstMAC:     dstMACv4,
+		srcIP:      &srcIPv4Test,
+		dstIP:      &dstIPv4Test,
 		isDNSQuery: true,
 		isIPv6:     false,
 	}
@@ -299,6 +302,8 @@ func TestSendBonjourPacket(t *testing.T) {
 		vlanTag:    parseVLANTag(initialPacketIPv6),
 		srcMAC:     srcMACv6,
 		dstMAC:     dstMACv6,
+		srcIP:      &srcIPv6Test,
+		dstIP:      &dstIPv6Test,
 		isDNSQuery: true,
 		isIPv6:     true,
 	}
@@ -315,13 +320,25 @@ func TestSendBonjourPacket(t *testing.T) {
 
 	pw := &mockPacketWriter{packet: nil}
 
-	sendPacket(pw, &bonjourTestPacketIPv4, newVlanTag, brMACTest)
-	if !reflect.DeepEqual(expectedPacketIPv4.Layers(), pw.packet.Layers()) {
+	sendPacket(pw, &bonjourTestPacketIPv4, newVlanTag, srcMACTest, dstMACTest, srcIPv4Test, dstIPv4Test)
+	if !cmpPacket(expectedPacketIPv4.Layers(), pw.packet.Layers()) {
 		t.Error("Error in sendBonjourPacket() for IPv4")
 	}
 
-	sendPacket(pw, &bonjourTestPacketIPv6, newVlanTag, brMACTest)
-	if !reflect.DeepEqual(expectedPacketIPv6.Layers(), pw.packet.Layers()) {
+	sendPacket(pw, &bonjourTestPacketIPv6, newVlanTag, srcMACTest, dstMACTest, srcIPv6Test, dstIPv6Test)
+	if !cmpPacket(expectedPacketIPv6.Layers(), pw.packet.Layers()) {
 		t.Error("Error in sendBonjourPacket() for IPv6")
 	}
+}
+
+// We cannot compare slices of packet layers directly, so we compare the payload of the UDP layer instead.
+func cmpPacket(a, b []gopacket.Layer) bool {
+	udpLayer := 3
+	if len(a) < udpLayer || len(b) < udpLayer {
+		return false
+	}
+
+	aBytes := a[udpLayer].(*layers.UDP).Payload
+	bBytes := b[udpLayer].(*layers.UDP).Payload
+	return bytes.Equal(aBytes, bBytes)
 }

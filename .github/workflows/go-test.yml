@@ -1,0 +1,44 @@
+on: [push, pull_request]
+name: Build and test Go application
+
+concurrency:
+  group: ${{ github.workflow }}-$${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test Go latest two versions
+    strategy:
+      matrix:
+        go-version: ['oldstable', 'stable']
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+      id: go
+
+    - name: Install deps
+      run: sudo apt-get -yy install libpcap-dev
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Go Vet
+      run: go vet ./...
+
+    - name: Test 
+      run: go test -v ./...
+
+    - name: Check for vulnerabilities
+      id: govulncheck
+      uses: golang/govulncheck-action@v1.0.1
+      with:
+        cache: false
+        go-version-input: ${{ matrix.go-version }}
+        go-package: ./...
