@@ -37,7 +37,7 @@ jobs:
 
     - name: Check for vulnerabilities
       id: govulncheck
-      uses: golang/govulncheck-action@v1.0.3
+      uses: golang/govulncheck-action@v1.0.4
       with:
         cache: false
         go-version-input: ${{ matrix.go-version }}
