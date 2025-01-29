@@ -170,5 +170,5 @@ If you see packets going in but not coming out, run the container in verbose mod
 
 Were `response packet` means that there is actual SSDP sessions set up. Which is a good sign.
 
-If you see packets coming out of the container but no response packet are received make absolute sure you have assigned the correct vlan ids on the bridge for the veth1-reflector interface. Also check if the veth1-reflector interface port is set to `ingress-filtering=no` and `frame-types=admit-only-vlan-tagged-and-priority-tagged`.
+If you see packets coming out of the container but no response packet are received make absolute sure you have assigned the correct vlan ids on the bridge for the veth1-reflector interface. Also check if the veth1-reflector interface port is set to `ingress-filtering=no` and `frame-types=admit-only-vlan-tagged`.
 
