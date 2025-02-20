@@ -3,7 +3,7 @@ module github.com/nberlee/bonjour-reflector
 go 1.24
 
 require (
-	github.com/google/gopacket v1.1.20-0.20210429153827-3eaba0894325
+	github.com/gopacket/gopacket v1.3.1
 	github.com/pelletier/go-toml v1.9.5
 	github.com/safchain/ethtool v0.5.10
 	github.com/sirupsen/logrus v1.9.3
