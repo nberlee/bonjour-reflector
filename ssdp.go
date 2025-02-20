@@ -31,7 +31,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 		logrus.Fatalf("Could not find network interface: %v", netInterface)
 	}
 
-	filterTemplate := "not (ether src %s) and vlan and udp and ((dst net (239.255.255.250 or ff02::c or ff05::c or ff08::c) and dst port 1900) or (ether dst %s and not dst port 5353))"
+	filterTemplate := "not (ether src %s) and vlan and udp and ((dst net (239.255.255.250 or ff02::c or ff05::c or ff08::c) and dst port 1900) or (ether dst %s and not port 5353))"
 
 	err = rawTraffic.SetBPFFilter(fmt.Sprintf(filterTemplate, srcMACAddress, srcMACAddress))
 	if err != nil {
@@ -44,7 +44,6 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 	ssdpPackets := parsePacketsLazily(source)
 
 	tmssdpQuerySession := timedmap.New(time.Second)
-	tmssdpAdvertisementSession := timedmap.New(time.Second)
 
 	for ssdpPacket := range ssdpPackets {
 		if !ssdpPacket.isSSDPAdvertisement && !ssdpPacket.isSSDPQuery && !ssdpPacket.isSSDPResponse {
@@ -111,14 +110,6 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 				continue
 			}
 
-			// Store network source network information for the SSDP response
-			ssdpSession := ssdpRequest{
-				ip:           *ssdpPacket.srcIP,
-				tag:          *ssdpPacket.vlanTag,
-				macAddress:   *ssdpPacket.srcMAC,
-				allowedVlans: device.SharedPools,
-			}
-
 			// Network devices may set dstMAC to the local MAC address
 			// Rewrite dstMAC to ensure that it is set to the appropriate multicast MAC address
 			if ssdpPacket.isIPv6 {
@@ -134,7 +125,6 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 						srcIP = nil
 					}
 				}
-				tmssdpAdvertisementSession.Set(*ssdpPacket.srcPort, ssdpSession, ssdpSessionDuration)
 				sendPacket(rawTraffic, &ssdpPacket, tag, srcMACAddress, dstMacAddress, srcIP, nil)
 			}
 			// Allowed Mac-address responding from on a SSDP query

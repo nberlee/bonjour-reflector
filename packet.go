@@ -53,7 +53,7 @@ func parsePacketsLazily(source *gopacket.PacketSource) chan multicastPacket {
 
 			// Check if DNS query
 			isDNSQuery, isDNSResponse := false, false
-			if dstPort != nil && *dstPort == 5353 {
+			if dstPort != nil && srcPort != nil && (*dstPort == 5353 || *srcPort == 5353) {
 				isDNSQuery, isDNSResponse = parseDNSPayload(payload)
 			}
 
