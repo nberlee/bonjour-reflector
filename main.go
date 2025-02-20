@@ -2,10 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
+
+	//_ "net/http/pprof"
 
 	"github.com/sirupsen/logrus"
 	_ "go.uber.org/automaxprocs"
@@ -14,16 +13,16 @@ import (
 func main() {
 	// Read config file and generate mDNS forwarding maps
 	configPath := flag.String("config", "", "Config file in TOML format")
-	debug := flag.Bool("debug", false, "Enable pprof server on /debug/pprof/")
+	//debug := flag.Bool("debug", false, "Enable pprof server on /debug/pprof/")
 	verbose := flag.Bool("verbose", false, "See packets")
 	silent := flag.Bool("silent", false, "Only warnings and errors")
 
 	flag.Parse()
 
 	// Start debug server
-	if *debug {
-		go debugServer(6060)
-	}
+	//if *debug {
+	//	go debugServer(6060)
+	//}
 	if *verbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -67,9 +66,9 @@ func main() {
 
 }
 
-func debugServer(port int) {
-	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
-	if err != nil {
-		logrus.Fatalf("The application was started with -debug flag but could not listen on port %v: \n %s", port, err)
-	}
-}
+//func debugServer(port int) {
+//	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
+//	if err != nil {
+//		logrus.Fatalf("The application was started with -debug flag but could not listen on port %v: \n %s", port, err)
+//	}
+//}
