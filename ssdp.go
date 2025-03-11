@@ -12,10 +12,9 @@ import (
 )
 
 type ssdpRequest struct {
-	ip           net.IP
-	tag          uint16
-	macAddress   net.HardwareAddr
-	allowedVlans []uint16
+	ip         net.IP
+	tag        uint16
+	macAddress net.HardwareAddr
 }
 
 var ssdpSessionDuration = 2 * time.Second
@@ -26,7 +25,7 @@ func processSSDPPackets(netInterface string, srcMACAddress net.HardwareAddr, poo
 	var dstMacAddress net.HardwareAddr
 
 	// Get a handle on the network interface
-	rawTraffic, err := pcap.OpenLive(netInterface, 65536, true, time.Second)
+	rawTraffic, err := pcap.OpenLive(netInterface, 65536, promiscuous, time.Second)
 	if err != nil {
 		logrus.Fatalf("Could not find network interface: %v", netInterface)
 	}
