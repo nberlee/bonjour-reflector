@@ -79,7 +79,7 @@ Creating the container is better to be done using a script. As updating a contai
 
 If you just want to test:
 ```mikrotik
-/container/add remote-image=ghcr.io/nberlee/bonjour-reflector:main int=veth1-reflector root-dir=containers/reflector mounts=reflector-config logging=yes start-on-boot="yes" comment="bonjour-reflector"
+/container/add remote-image=ghcr.io/nberlee/bonjour-reflector:main int=veth1-mdns root-dir=containers/reflector mounts=reflector-config logging=yes start-on-boot="yes" comment="bonjour-reflector"
 ```
 
 
@@ -156,7 +156,7 @@ Please make sure your RouterOS has enabled container support. See step 3 in `Ena
 ## No MDNS/SSDP is reflected
 Make sure traffic is going into the container and is coming out. You can do see this in winbox with the following steps:
 1. Tools -> Packet Sniffer
-2. Tab Filter, Interfaces -> select veth1-reflector
+2. Tab Filter, Interfaces -> select veth1-mdns
 3. Make sure direction is any and no other filters are set. Press Apply, then press Start. 
 4. Press Packets and add VLAN to the columns. by clicking on the arrow next to the column names -> Show Columns -> VLAN -> OK
 5. Do not forget to stop the packet sniffer when you are done.
@@ -174,7 +174,7 @@ If you see packets going in but not coming out, run the container in verbose mod
 
 Were `response packet` means that there is actual SSDP sessions set up. Which is a good sign.
 
-If you see packets coming out of the container but no response packet are received make absolute sure you have assigned the correct vlan ids on the bridge for the veth1-reflector interface. Also check if the veth1-reflector interface port is set to `ingress-filtering=no` and `frame-types=admit-only-vlan-tagged`.
+If you see packets coming out of the container but no response packet are received make absolute sure you have assigned the correct vlan ids on the bridge for the veth1-mdns interface. Also check if the veth1-mdns interface port is set to `ingress-filtering=no` and `frame-types=admit-only-vlan-tagged`.
 
 ## level=fatal msg=route ip+net: no such network interface (after ROS7.20+ upgrade)
 For ROS 7.19 and below
