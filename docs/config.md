@@ -1,6 +1,8 @@
 The config.toml file is used to configure the reflector.
 
-* `net_interface` is the interface the container will use to send and receive packets. In a container this is always `eth0`.
+* `net_interface` is the interface the container will use to send and receive packets.
+  ROS 7.19 and below In a container this is always `eth0`.
+  ROS 7.20+ In a container set how you named veth interface, but less than 14 chars
 * `devices` is a list of devices that will be available to the `shared_pools` vlan ids. Only devices that are listed here will be available to the shared_pools. The `origin_pool` is the vlan id that the device is connected to. The `shared_pools` are the vlan ids that the device will be available to.
 
 This example we have the following networks:
