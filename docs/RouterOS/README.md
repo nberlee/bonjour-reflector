@@ -12,10 +12,10 @@ This step-by-step guide will help you setup your mikrotik router to run the refl
 ## Setup network
 Note: Best practice is for Docker installs to utilize a dedicated bridge for the containers, and in their [documentation](https://help.mikrotik.com/docs/display/ROS/Container) Mikrotik configures the same on your router. However, for this particular container this would not work, so do make sure to specify the actual bridge on which your VLANs run. 
 
-1. Create a veth interface to be used by the reflector container, this interface will be used to connect the container to the bridge. The address and gateway are not used, but are required to create the interface. `/interface/veth/add name=veth1-reflector address=127.1.0.10/32 gateway=127.1.0.1` 
+1. Create a veth interface to be used by the reflector container, this interface will be used to connect the container to the bridge. The address and gateway are not used, but are required to create the interface. `/interface/veth/add name=veth1-mdns address=127.1.0.10/32 gateway=127.1.0.1` (ROS7.20+) limit your interface name to 14 characters
 
-2. Create a bridge port for the veth interface. Make sure to change the `bridge=` to your bridge name. `ingress-filtering=no` on the port is really needed, not sure why, as in the next step we assign the vlans ids. use a non existent pvid, as it won't be needed. `/interface/bridge/port/add bridge=bridge1 edge=yes frame-types=admit-only-vlan-tagged ingress-filtering=no interface=veth1-reflector learn=yes multicast-router=permanent point-to-point=yes pvid=999`
-3. Add `veth1-reflector` as tagged port to the vlans you want to use.
+2. Create a bridge port for the veth interface. Make sure to change the `bridge=` to your bridge name. `ingress-filtering=no` on the port is really needed, not sure why, as in the next step we assign the vlans ids. use a non existent pvid, as it won't be needed. `/interface/bridge/port/add bridge=bridge1 edge=yes frame-types=admit-only-vlan-tagged ingress-filtering=no interface=veth1-mdns learn=yes multicast-router=permanent point-to-point=yes pvid=999`
+3. Add `veth1-mdns` as tagged port to the vlans you want to use.
 
 Change the `bridge` to your bridge and `vlan-ids` to the vlans you want to use.
 
@@ -52,6 +52,8 @@ Edit your own `config.toml` and upload it to your router in a directory, for exa
 
 Afterwards changes may be done to the file without reuploading again, using:
 
+Warning for ROS7.20+ Don't forget to change interface in config.toml according to VETH interface name (in this example veth1-mdns), but remember about 14 characters interface name length limit
+
 ```mikrotik
 /file edit pub/config.toml
 ```
@@ -84,7 +86,7 @@ If you just want to test:
 A more permanent, status checking, and updating script:
 ```mikrotik
 /system script add dont-require-permissions=no name=recreate-reflector-container owner=admin policy=read,write,test source=":local tag \"ghcr.io/nberlee/bonjour-reflector:main\";\r\
-    \n:local interface \"veth1-reflector\";\r\
+    \n:local interface \"veth1-mdns\";\r\
     \n:local containerLogging \"yes\";\r\
     \n:local mount \"reflector-config\";\r\
     \n:local rootdir \"containers/reflector\";\r\
@@ -174,3 +176,10 @@ Were `response packet` means that there is actual SSDP sessions set up. Which is
 
 If you see packets coming out of the container but no response packet are received make absolute sure you have assigned the correct vlan ids on the bridge for the veth1-reflector interface. Also check if the veth1-reflector interface port is set to `ingress-filtering=no` and `frame-types=admit-only-vlan-tagged`.
 
+## level=fatal msg=route ip+net: no such network interface (after ROS7.20+ upgrade)
+For ROS 7.19 and below
+1. Make sure that in config.toml interface set to eth0
+
+For ROS7.20+:
+1. Make sure that in config.toml interface set to yours VETH interface name (in this example 'net_interface = "veth1-mdns"')
+2. Make sure that VETH interface name length is below 14 characters
