@@ -79,48 +79,51 @@ Creating the container is better to be done using a script. As updating a contai
 
 If you just want to test:
 ```mikrotik
-/container/add remote-image=ghcr.io/nberlee/bonjour-reflector:main int=veth1-mdns root-dir=containers/reflector mounts=reflector-config logging=yes start-on-boot="yes" comment="bonjour-reflector"
+/container/add remote-image=ghcr.io/nberlee/bonjour-reflector:main int=veth1-mdns root-dir=containers/reflector mountlist=reflector-config logging=yes start-on-boot="yes" comment="bonjour-reflector"
 ```
 
 
 A more permanent, status checking, and updating script:
 ```mikrotik
-/system script add dont-require-permissions=no name=recreate-reflector-container owner=admin policy=read,write,test source=":local tag \"ghcr.io/nberlee/bonjour-reflector:main\";\r\
-    \n:local interface \"veth1-mdns\";\r\
-    \n:local containerLogging \"yes\";\r\
-    \n:local mount \"reflector-config\";\r\
-    \n:local rootdir \"containers/reflector\";\r\
-    \n\r\
-    \n#pinghost for internet connectivity check\r\
-    \n:local pinghost \"ghcr.io\";\r\
-    \n\r\
-    \n# check if container is already running and remove stopped containers\r\
-    \nforeach container in=[/container/find tag=\$tag] do={\r\
-    \n  :local status [/container/get \$container status];\r\
-    \n  if (\$status != \"running\") do={\r\
-    \n    /container/remove \$container;\r\
-    \n  }\r\
-    \n  if (\$status = \"running\") do={\r\
-    \n    :error \"container already running\";\r\
-    \n  }\r\
-    \n}\r\
-    \n\r\
-    \n# test if we have internet connectivity\r\
-    \n:local continue true;\r\
-    \n:while (\$continue) do={\r\
-    \n  do {\r\
-    \n    /ping address=\$pinghost count=1;\r\
-    \n    :set continue false;\r\
-    \n   } on-error={\r\
-    \n    delay 1s;\r\
-    \n  }\r\
-    \n} \r\
-    \n\r\
-    \n:local reflector [/container/add remote-image=\$tag int=\$interface root-dir=\$rootdir mounts=\$mount logging=\$containerLogging start-on-boot=\"yes\" comment=\"bonjour-reflector\"];\r\
-    \n:while ([/container/get \$reflector status] != \"stopped\") do={ :delay 1s; }\r\
-    \n/container/start \$reflector;\r\
-    \n\r\
-    \n"
+/system script add dont-require-permissions=no name=recreate-reflector-container \
+    owner=admin policy=read,write,test source=":local reflectortag \"ghcr.io\
+    /nberlee/bonjour-reflector:main\";\
+    \n:local interface \"veth1-mdns\";\
+    \n:local containerLogging \"yes\";\
+    \n:local mount \"reflector-config\";\
+    \n:local rootdir \"containers/reflector\";\
+    \n\
+    \n#pinghost for internet connectivity check\
+    \n:local pinghost \"ghcr.io\";\
+    \n\
+    \n# check if container is already running and remove stopped containers\
+    \nforeach container in=[/container/find tag=\$reflectortag] do={\
+    \n  :local status [/container/get \$container value-name=running];\
+    \n  if (\$status != true) do={\
+    \n    /container/remove \$container;\
+    \n  }\
+    \n  if (\$status = true) do={\
+    \n    :error \"container already running\";\
+    \n  }\
+    \n}\
+    \n\
+    \n# test if we have internet connectivity\
+    \n:local continue true;\
+    \n:while (\$continue) do={\
+    \n  do {\
+    \n    /ping address=\$pinghost count=1;\
+    \n    :set continue false;\
+    \n   } on-error={\
+    \n    delay 1s;\
+    \n  }\
+    \n} \
+    \n\
+    \n:local reflector [/container/add remote-image=\$reflectortag int=\$inter\
+    face root-dir=\$rootdir mountlist=\$mount logging=\$containerLogging start\
+    -on-boot=\"yes\" comment=\"bonjour-reflector\"];\
+    \n:while ([/container/get \$reflector value-name=stopped] != true) do={ :d\
+    elay 1s; }\
+    \n/container/start \$reflector;"
 ```
 execute the script
 ```mikrotik
