@@ -12,8 +12,7 @@ This step-by-step guide will help you setup your mikrotik router to run the refl
 ## Setup network
 Note: Best practice is for Docker installs to utilize a dedicated bridge for the containers, and in their [documentation](https://help.mikrotik.com/docs/display/ROS/Container) Mikrotik configures the same on your router. However, for this particular container this would not work, so do make sure to specify the actual bridge on which your VLANs run. 
 
-1. Create a veth interface to be used by the reflector container, this interface will be used to connect the container to the bridge. The address and gateway are not used, but are required to create the interface. `/interface/veth/add name=veth1-mdns address=127.1.0.10/32 gateway=127.1.0.1` (ROS7.20+) limit your interface name to 14 characters
-
+1. Create a veth interface to be used by the reflector container, this interface will be used to connect the container to the bridge. The address and gateway are not used, but are required to create the interface. `/interface/veth/add name=veth1-mdns address=10.10.21.2/24 gateway=10.10.21.1` (ROS7.20+) limit your interface name to 14 characters. address specified(needs to be defined as /24) should be a valid lan/vlan address in your environment and gateway should be its corresponding gateway.  
 2. Create a bridge port for the veth interface. Make sure to change the `bridge=` to your bridge name. `ingress-filtering=no` on the port is really needed, not sure why, as in the next step we assign the vlans ids. use a non existent pvid, as it won't be needed. `/interface/bridge/port/add bridge=bridge1 edge=yes frame-types=admit-only-vlan-tagged ingress-filtering=no interface=veth1-mdns learn=yes multicast-router=permanent point-to-point=yes pvid=999`
 3. Add `veth1-mdns` as tagged port to the vlans you want to use.
 
@@ -79,48 +78,51 @@ Creating the container is better to be done using a script. As updating a contai
 
 If you just want to test:
 ```mikrotik
-/container/add remote-image=ghcr.io/nberlee/bonjour-reflector:main int=veth1-mdns root-dir=containers/reflector mounts=reflector-config logging=yes start-on-boot="yes" comment="bonjour-reflector"
+/container/add remote-image=ghcr.io/nberlee/bonjour-reflector:main int=veth1-mdns root-dir=containers/reflector mountlist=reflector-config logging=yes start-on-boot="yes" comment="bonjour-reflector"
 ```
 
 
 A more permanent, status checking, and updating script:
 ```mikrotik
-/system script add dont-require-permissions=no name=recreate-reflector-container owner=admin policy=read,write,test source=":local tag \"ghcr.io/nberlee/bonjour-reflector:main\";\r\
-    \n:local interface \"veth1-mdns\";\r\
-    \n:local containerLogging \"yes\";\r\
-    \n:local mount \"reflector-config\";\r\
-    \n:local rootdir \"containers/reflector\";\r\
-    \n\r\
-    \n#pinghost for internet connectivity check\r\
-    \n:local pinghost \"ghcr.io\";\r\
-    \n\r\
-    \n# check if container is already running and remove stopped containers\r\
-    \nforeach container in=[/container/find tag=\$tag] do={\r\
-    \n  :local status [/container/get \$container status];\r\
-    \n  if (\$status != \"running\") do={\r\
-    \n    /container/remove \$container;\r\
-    \n  }\r\
-    \n  if (\$status = \"running\") do={\r\
-    \n    :error \"container already running\";\r\
-    \n  }\r\
-    \n}\r\
-    \n\r\
-    \n# test if we have internet connectivity\r\
-    \n:local continue true;\r\
-    \n:while (\$continue) do={\r\
-    \n  do {\r\
-    \n    /ping address=\$pinghost count=1;\r\
-    \n    :set continue false;\r\
-    \n   } on-error={\r\
-    \n    delay 1s;\r\
-    \n  }\r\
-    \n} \r\
-    \n\r\
-    \n:local reflector [/container/add remote-image=\$tag int=\$interface root-dir=\$rootdir mounts=\$mount logging=\$containerLogging start-on-boot=\"yes\" comment=\"bonjour-reflector\"];\r\
-    \n:while ([/container/get \$reflector status] != \"stopped\") do={ :delay 1s; }\r\
-    \n/container/start \$reflector;\r\
-    \n\r\
-    \n"
+/system script add dont-require-permissions=no name=recreate-reflector-container \
+    owner=admin policy=read,write,test source=":local reflectortag \"ghcr.io\
+    /nberlee/bonjour-reflector:main\";\
+    \n:local interface \"veth1-mdns\";\
+    \n:local containerLogging \"yes\";\
+    \n:local mount \"reflector-config\";\
+    \n:local rootdir \"containers/reflector\";\
+    \n\
+    \n#pinghost for internet connectivity check\
+    \n:local pinghost \"ghcr.io\";\
+    \n\
+    \n# check if container is already running and remove stopped containers\
+    \nforeach container in=[/container/find tag=\$reflectortag] do={\
+    \n  :local status [/container/get \$container value-name=running];\
+    \n  if (\$status != true) do={\
+    \n    /container/remove \$container;\
+    \n  }\
+    \n  if (\$status = true) do={\
+    \n    :error \"container already running\";\
+    \n  }\
+    \n}\
+    \n\
+    \n# test if we have internet connectivity\
+    \n:local continue true;\
+    \n:while (\$continue) do={\
+    \n  do {\
+    \n    /ping address=\$pinghost count=1;\
+    \n    :set continue false;\
+    \n   } on-error={\
+    \n    delay 1s;\
+    \n  }\
+    \n} \
+    \n\
+    \n:local reflector [/container/add remote-image=\$reflectortag int=\$inter\
+    face root-dir=\$rootdir mountlist=\$mount logging=\$containerLogging start\
+    -on-boot=\"yes\" comment=\"bonjour-reflector\"];\
+    \n:while ([/container/get \$reflector value-name=stopped] != true) do={ :d\
+    elay 1s; }\
+    \n/container/start \$reflector;"
 ```
 execute the script
 ```mikrotik
