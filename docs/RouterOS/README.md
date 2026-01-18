@@ -12,8 +12,7 @@ This step-by-step guide will help you setup your mikrotik router to run the refl
 ## Setup network
 Note: Best practice is for Docker installs to utilize a dedicated bridge for the containers, and in their [documentation](https://help.mikrotik.com/docs/display/ROS/Container) Mikrotik configures the same on your router. However, for this particular container this would not work, so do make sure to specify the actual bridge on which your VLANs run. 
 
-1. Create a veth interface to be used by the reflector container, this interface will be used to connect the container to the bridge. The address and gateway are not used, but are required to create the interface. `/interface/veth/add name=veth1-mdns address=127.1.0.10/32 gateway=127.1.0.1` (ROS7.20+) limit your interface name to 14 characters
-
+1. Create a veth interface to be used by the reflector container, this interface will be used to connect the container to the bridge. The address and gateway are not used, but are required to create the interface. `/interface/veth/add name=veth1-mdns address=10.10.21.2/24 gateway=10.10.21.1` (ROS7.20+) limit your interface name to 14 characters. address specified(needs to be defined as /24) should be a valid lan/vlan address in your environment and gateway should be its corresponding gateway.  
 2. Create a bridge port for the veth interface. Make sure to change the `bridge=` to your bridge name. `ingress-filtering=no` on the port is really needed, not sure why, as in the next step we assign the vlans ids. use a non existent pvid, as it won't be needed. `/interface/bridge/port/add bridge=bridge1 edge=yes frame-types=admit-only-vlan-tagged ingress-filtering=no interface=veth1-mdns learn=yes multicast-router=permanent point-to-point=yes pvid=999`
 3. Add `veth1-mdns` as tagged port to the vlans you want to use.
 
