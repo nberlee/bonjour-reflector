@@ -24,7 +24,7 @@ jobs:
       run: sudo apt-get -yy install libpcap-dev
 
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Download dependencies
       run: go mod download
