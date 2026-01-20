@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"net"
+	"time"
 
 	//_ "net/http/pprof"
 
@@ -10,12 +11,19 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+var promiscuous bool = false
+
 func main() {
 	// Read config file and generate mDNS forwarding maps
 	configPath := flag.String("config", "", "Config file in TOML format")
 	//debug := flag.Bool("debug", false, "Enable pprof server on /debug/pprof/")
 	verbose := flag.Bool("verbose", false, "See packets")
 	silent := flag.Bool("silent", false, "Only warnings and errors")
+	keepVlanFilter := flag.Bool("keep-vlan-filter", false, "Keep vlan filter")
+	noSSDP := flag.Bool("no-ssdp", false, "Disable SSDP")
+	noBonjour := flag.Bool("no-bonjour", false, "Disable Bonjour")
+	noNDPARP := flag.Bool("no-ndp-arp", false, "Disable NDP and ARP")
+	promiscuous = *flag.Bool("promiscuous", false, "Enable promiscuous mode")
 
 	flag.Parse()
 
@@ -52,15 +60,30 @@ func main() {
 	}
 	srcMACAddress := intf.HardwareAddr
 
-	removeVlanFilter(intf.Name)
+	if !*keepVlanFilter {
+		removeVlanFilter(intf.Name)
+	}
 
 	stop := make(chan struct{})
 	defer close(stop)
 
-	go ownupNetworkAddresses(cfg.NetInterface, srcMACAddress, vlanIPMap, stop)
+	if !*noNDPARP {
+		go ownupNetworkAddresses(cfg.NetInterface, srcMACAddress, vlanIPMap, stop)
+	}
 
 	allowedMacsMap := mapLowerCaseMac(cfg.Devices)
-	go processSSDPPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
+	if !*noSSDP {
+		if *noBonjour {
+			processSSDPPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
+			return
+		}
+		go processSSDPPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
+	}
+	if *noBonjour {
+		for {
+			time.Sleep(1 * time.Hour)
+		}
+	}
 
 	processBonjourPackets(cfg.NetInterface, srcMACAddress, poolsMap, vlanIPMap, allowedMacsMap)
 

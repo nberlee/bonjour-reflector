@@ -14,7 +14,7 @@ import (
 func ownupNetworkAddresses(netInterface string, srcMACAddress net.HardwareAddr, vlanIPMap map[uint16]net.IP, stop chan struct{}) {
 	IPv6Address = generateIPv6FromMac(srcMACAddress)
 	// Get a handle on the network interface
-	rawTraffic, err := pcap.OpenLive(netInterface, 65536, true, time.Second)
+	rawTraffic, err := pcap.OpenLive(netInterface, 65536, promiscuous, time.Second)
 	if err != nil {
 		logrus.Fatalf("Could not find network interface: %v", netInterface)
 	}
